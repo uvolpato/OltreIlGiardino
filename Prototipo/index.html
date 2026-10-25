@@ -1817,11 +1817,11 @@ function viewRisorse(){
    VISTA: MAGAZZINO
    ============================================================ */
 /* report cartacei del giorno, uno per ordine:
-   - Da preparare: i carichi (CARICO) che iniziano nel giorno → articoli da preparare e caricare
+   - Da preparare: i carichi (CARICO) del giorno DOPO quello scelto (si stampa la sera prima) → articoli da preparare e caricare
    - Rientri attesi: rientri e riconsegne (RIENTRO, RICONSEGNA) del giorno → articoli da controllare al rientro
    Le persone sono quelle schedulate su quel task. Le caselle e le colonne vuote si compilano a penna. */
 function magReport(tipo,d){
-  const k=dkey(d), tipi=tipo==="prep"?["CARICO"]:["RIENTRO","RICONSEGNA"];
+  const k=dkey(tipo==="prep"?addD(d,1):d), tipi=tipo==="prep"?["CARICO"]:["RIENTRO","RICONSEGNA"];
   return tutti().filter(t=>tipi.includes(t.tipo)&&dkey(t.inizio)===k).sort((a,b)=>a.inizio-b.inizio).map(t=>{
     const o=ord(t.oid), andata=tipo==="prep"?legTasks(o,t.leg).find(x=>x.tipo!=="CARICO"&&TIPI[x.tipo].mezzo):null;
     return {t,o,mezzi:t.mezzi.length?t.mezzi:(andata?.mezzi||[]),partenza:andata?.inizio,righe:o.righe.map(([c,q])=>({c,q,a:ART[c]}))};
@@ -1849,14 +1849,14 @@ function viewMagazzino(){
   <div class="sheet-head no-print"><div class="grow"><div class="eyebrow">Magazzino</div><h2>${esc(dayLong(d))}</h2></div>
     <button class="btn" data-act="export-magazzino">Esporta CSV</button><button class="btn btn-primary" data-act="print">Stampa ${tab==="prep"?"preparazioni":"rientri"}</button></div>
   <div class="no-print">${UI.kpiRiga([[prep.length,"ordini da preparare"],[pezzi(prep),"pezzi in uscita"],[rien.length,"rientri attesi"],[pezzi(rien),"pezzi in rientro"],[senza(prep)+senza(rien),"senza persone"]])}</div>
-  <div class="card no-print">${UI.schede("mtab",[["prep",`Da preparare <span class="tab-n">${prep.length}</span>`],["rien",`Rientri attesi <span class="tab-n">${rien.length}</span>`]])}</div>
-  <div class="print-only mag-title"><b>${tab==="prep"?"Preparazioni":"Rientri attesi"} — ${esc(dayLong(d))}</b> · ${MAGAZZINO}</div>
-  <div class="mag-list">${list.map(r=>magScheda(r,tab)).join("")||`<div class="card"><div class="empty">${tab==="prep"?"Nessuna preparazione":"Nessun rientro"} in questo giorno. Usa le frecce in alto per cambiare giorno.</div></div>`}</div>`;
+  <div class="card no-print">${UI.schede("mtab",[["prep",`Da preparare per domani <span class="tab-n">${prep.length}</span>`],["rien",`Rientri attesi <span class="tab-n">${rien.length}</span>`]])}</div>
+  <div class="print-only mag-title"><b>${tab==="prep"?`Preparazioni per ${esc(dayLong(addD(d,1)))}`:`Rientri attesi — ${esc(dayLong(d))}`}</b> · ${MAGAZZINO}</div>
+  <div class="mag-list">${list.map(r=>magScheda(r,tab)).join("")||`<div class="card"><div class="empty">${tab==="prep"?"Nessuna preparazione per il giorno dopo":"Nessun rientro in questo giorno"}. Usa le frecce in alto per cambiare giorno.</div></div>`}</div>`;
 }
 function esportaMagazzinoCSV(){
   const d=state.date, k=dkey(d), tab=state.mtab||"prep", q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
   const rows=[["Data","Report","Ordine","Cliente","Ora","Persone","Mezzo","Codice","Articolo","Quantità"]];
-  magReport(tab,d).forEach(r=>r.righe.forEach(x=>rows.push([k,tab==="prep"?"Preparazione":"Rientro",r.o.numero,r.o.cliente,hm(r.t.inizio),r.t.risorse.join(", "),r.mezzi.join(" + "),x.c,x.a?.desc||"",x.q])));
+  magReport(tab,d).forEach(r=>r.righe.forEach(x=>rows.push([dkey(r.t.inizio),tab==="prep"?"Preparazione":"Rientro",r.o.numero,r.o.cliente,hm(r.t.inizio),r.t.risorse.join(", "),r.mezzi.join(" + "),x.c,x.a?.desc||"",x.q])));
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob(["﻿"+rows.map(r=>r.map(q).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"}));
   a.download=`Magazzino ${tab==="prep"?"preparazioni":"rientri"} ${k}.csv`; a.click(); URL.revokeObjectURL(a.href);
@@ -2990,7 +2990,7 @@ const AIUTI={
   "vista-pianificazione":"<b>Pianificazione (Gantt)</b>: tutti gli ordini e i loro micro-task su una timeline. I conflitti (sovrapposizioni, mezzi non ammessi in ZTL, assenze) pulsano in rosso. Trascina le barre per spostare i task, clicca una barra per aprire il dettaglio. Usa «Proponi risorse» per far proporre squadre e mezzi.",
   "vista-ordini":"<b>Ordini</b>: elenco delle offerte importate. Cerca, filtra per stato e servizio, ordina per colonna. Clicca una riga per aprire il dettaglio dell'ordine con il piano dei micro-task.",
   "vista-risorse":"<b>Risorse e anagrafiche</b>: tutto ciò che alimenta il piano — addetti (con ruoli, patenti e certificazioni), mezzi, squadre, trasportatori, articoli, zone ZTL, micro-task/formule e le tabelle di lookup. Qui si creano e modificano le entità con i pulsanti «Nuovo» e «Modifica/Elimina».",
-  "vista-magazzino":"<b>Magazzino</b>: i report cartacei del giorno scelto, uno per ordine. «Da preparare» elenca gli articoli da preparare e caricare, con le persone e il mezzo schedulati; «Rientri attesi» elenca cosa deve tornare, con le colonne da compilare (rientrati, danneggiati, mancanti). Cambia giorno con le frecce in alto, poi «Stampa».",
+  "vista-magazzino":"<b>Magazzino</b>: i report cartacei del giorno scelto, uno per ordine. «Da preparare per domani» elenca, per i carichi del giorno dopo, gli articoli da preparare e caricare, con le persone e il mezzo schedulati; «Rientri attesi» elenca cosa deve tornare, con le colonne da compilare (rientrati, danneggiati, mancanti). Cambia giorno con le frecce in alto, poi «Stampa».",
   "vista-notifiche":"<b>Notifiche & ore</b>: gli alert pendenti (conferme motrice, autorizzazioni ZTL, mock WhatsApp) e la riconciliazione delle ore pianificate/effettive/fatturate.",
   "vista-componenti":"<b>Componenti</b>: catalogo dal vivo della libreria UI (window.UI). Serve a chi sviluppa o configura l'interfaccia: ogni blocco è riusato dalle schermate dell'applicazione.",
   "seq-ordine":"<b>Sequenza micro-task</b>: tutti i micro-task dell'ordine in ordine cronologico. Clicca una tappa per aprire il dettaglio di quel task. La tappa evidenziata è quella corrente; il pallino rosso segnala un conflitto.",
