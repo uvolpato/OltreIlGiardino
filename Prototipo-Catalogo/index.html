@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Serra · Catalogo prodotti</title>
+<title>Oltre Il Giardino · Catalogo prodotti</title>
 <link rel="icon" href="assets/logo-oig.png">
 <style>
 :root{
@@ -650,7 +650,7 @@ dialog.confirm{width:min(440px,94vw)}
 <script>
 "use strict";
 /* ============================================================
-   SERRA · CATALOGO — prototipo dell'anagrafica articoli
+   OLTRE IL GIARDINO · CATALOGO — prototipo dell'anagrafica articoli
     Dati: file articoli (2.194 articoli) convertito da Catalogo/converti.js.
    AI simulata: Nano Banana (foto di presentazione) e LLM (descrizione, temi) sono imitati nel browser;
    i colori della foto invece sono calcolati davvero (k-means sui pixel).
@@ -745,7 +745,7 @@ const toast=(m,k="")=>{const n=document.createElement("div"); n.className="toast
 const RUOLI_U={censitore:["Censitore","magazzino e location: censisce da telefono"],curatore:["Curatore","rivede, approva, gestisce composizioni e prompt"],commerciale:["Commerciale","consulta e cerca per tema e colore"],logistica:["Logistica","completa misure e pesi"]};
 const RUOLO_N=Object.fromEntries(Object.entries(RUOLI_U).map(([k,v])=>[k,v[0]]));
 function viewAccesso(){
-  return `<div class="login"><div class="login-card card"><img src="assets/logo-oig.png" alt="" width="120"><h1>Serra</h1><p class="muted">La piattaforma di Oltre Il Giardino — un solo accesso per Logistica, Catalogo e (in seguito) Magazzino, da computer e da telefono.</p>
+  return `<div class="login"><div class="login-card card"><img src="assets/logo-oig.png" alt="" width="120"><h1>Oltre Il Giardino</h1><p class="muted">Un solo accesso per Logistica, Catalogo e (in seguito) Magazzino, da computer e da telefono.</p>
     <div class="login-sso"><button class="btn btn-primary" disabled>Accedi con l'account aziendale</button><span class="tiny muted">SSO aziendale — nel prototipo scegli un ruolo:</span></div>
     <div class="ruoli">${Object.entries(RUOLI_U).map(([k,[n,d]])=>`<button class="ruolo" data-act="ruolo" data-v="${k}">${icon("user",18)}<strong>${n}</strong><span class="small muted">${d}</span></button>`).join("")}</div></div></div>`;
 }
@@ -766,7 +766,7 @@ function render(){
   const vis=VISIBILI[state.ruolo]; if(!vis.includes(state.view)) state.view=vis[0];
   const nRev=ARTICOLI().filter(a=>({...a,...(DB.ov[a.c]||{})}).stato==="revisione").length;
   $("app").innerHTML=`<div class="app">
-    <aside class="sidebar"><div class="brand"><img src="assets/logo-oig.png" alt="" width="241" height="163"><div><strong>Serra</strong><small>Catalogo prodotti</small></div></div>
+    <aside class="sidebar"><div class="brand"><img src="assets/logo-oig.png" alt="" width="241" height="163"><div><strong>Oltre Il Giardino</strong><small>Catalogo prodotti</small></div></div>
       <nav class="nav" aria-label="Sezioni">${vis.map(k=>`<button data-act="view" data-v="${k}" aria-current="${state.view===k?"page":"false"}">${icon(VIEWS[k].i)}<span class="lbl">${VIEWS[k].l}</span>${k==="revisione"&&nRev?`<span class="count">${nRev}</span>`:""}</button>`).join("")}</nav>
       <div class="side-foot">Accesso come <strong>${RUOLO_N[state.ruolo]}</strong> · <button class="link" data-act="esci">cambia</button><br>Altre sezioni: <span class="muted">Logistica</span> · <span class="muted">Magazzino (in arrivo)</span><br><span class="tiny">Prototipo: AI simulata, modifiche salvate solo in questo browser. <button class="link" data-act="reset">Azzera</button></span></div></aside>
     <div class="main"><header class="topbar"><div class="title"><h1>${VIEWS[state.view].l}</h1><p>${VIEWS[state.view].sub}</p></div>

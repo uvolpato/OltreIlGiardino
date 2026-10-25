@@ -16,7 +16,7 @@ html = f"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Serra · Catalogo prodotti</title>
+<title>Oltre Il Giardino · Catalogo prodotti</title>
 <link rel="icon" href="assets/logo-oig.png">
 <style>{stile}
 {(QUI / "catalogo.css").read_text(encoding="utf-8")}</style>

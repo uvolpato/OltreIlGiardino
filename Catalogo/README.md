@@ -1,4 +1,4 @@
-# Prototipo Catalogo prodotti (Serra · Catalogo)
+# Prototipo Catalogo prodotti (Oltre Il Giardino · Catalogo)
 
 Prototipo separato dalla Logistica per l'anagrafica articoli. Specifiche: `../PRD_Catalogo_Prodotti.md`.
 

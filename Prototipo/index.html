@@ -7,6 +7,8 @@
 <title>Pianificatore Logistica — Oltre Il Giardino</title>
 <link rel="icon" href="assets/logo-oig.png">
 <script src="assets/offerte/indice.js"></script>
+<!-- dati reali (esclusi da git) se presenti in locale, altrimenti le offerte anonimizzate pubblicate (Estrazione/anonimizza.py) -->
+<script>window.OFFERTE_DIR=window.OFFERTE?"assets/offerte":"assets/offerte-demo"; if(!window.OFFERTE) document.write('<script src="assets/offerte-demo/indice.js"><'+'/script>');</script>
 <!-- Font di sistema: nessuna dipendenza esterna (design system Gestione Magazzino) -->
 <style>
 :root{
@@ -2560,7 +2562,7 @@ async function ingestFile(f){
 }
 async function ingestOfferta(id){
   const o=OFFERTE.find(x=>x.id===id);
-  try{ if(!window.OFFERTE_PDF?.[id]) await script(`assets/offerte/${id}.js`); }
+  try{ if(!window.OFFERTE_PDF?.[id]) await script(`${window.OFFERTE_DIR}/${id}.js`); }
   catch{ return toast("PDF non trovato in assets/offerte.","warn"); }
   ingestStart(o,o.file,Uint8Array.from(atob(window.OFFERTE_PDF[id]),c=>c.charCodeAt(0)));
 }
