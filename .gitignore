@@ -1,0 +1,20 @@
+# segreti
+Estrazione/.env
+.env
+
+# dati reali dei clienti (offerte, listini, estrazioni): il repository è pubblico
+PDF Offerte/
+Documenti Vari/
+Estrazione/output/
+Prototipo/assets/offerte/
+
+# copie di lavoro e strumenti locali
+Prototipo/index-backup*.html
+.agents/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# listino generato dal file Excel (fornitori, prezzi netti e di vendita): si rigenera con Catalogo/converti.py
+Prototipo-Catalogo/assets/articoli.js

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OffertaNoleggio",
+  "description": "Dati operativi di un'offerta di noleggio arredi per eventi (Oltre Il Giardino), usati per pianificare carico, consegna, allestimento e ritiro. Estrarre solo ciò che è scritto nel documento; se un dato manca usare null.",
+  "type": "object",
+  "properties": {
+    "numero_offerta": {
+      "type": ["string", "null"],
+      "description": "Numero dell'offerta senza revisione, così come stampato vicino alla parola 'Offerta' (es. '2026-31' da '2026-31_v_1')."
+    },
+    "revisione": {
+      "type": ["string", "null"],
+      "description": "Numero di revisione/versione dell'offerta (es. '1' da '2026-31_v_1' o 'V3'). Solo la cifra."
+    },
+    "data_offerta": {
+      "type": ["string", "null"],
+      "description": "Data di emissione dell'offerta (campo 'Del'), formato AAAA-MM-GG."
+    },
+    "responsabile_offerta": {
+      "type": ["string", "null"],
+      "description": "Referente commerciale interno che ha curato l'offerta (campo 'A Cura di'). Solo il nome come scritto."
+    },
+    "stato": {
+      "type": ["string", "null"],
+      "description": "Stato dell'offerta se indicato (es. 'Confermata'). null se il campo è vuoto."
+    },
+    "cliente": {
+      "type": "object",
+      "description": "Dati del cliente dal riquadro 'Cliente'.",
+      "properties": {
+        "ragione_sociale": { "type": ["string", "null"], "description": "Ragione sociale del cliente come stampata." },
+        "indirizzo": { "type": ["string", "null"], "description": "Indirizzo di fatturazione del cliente (via, CAP, città)." },
+        "partita_iva": { "type": ["string", "null"], "description": "Partita IVA, solo cifre." },
+        "codice_fiscale": { "type": ["string", "null"], "description": "Codice fiscale del cliente, se diverso o presente." },
+        "codice_sdi": { "type": ["string", "null"], "description": "Codice destinatario SDI." },
+        "referente": { "type": ["string", "null"], "description": "Persona di riferimento del cliente (campo 'Ref'), solo nome e cognome." },
+        "telefono_referente": { "type": ["string", "null"], "description": "Telefono o cellulare del referente cliente, cifre e spazi come stampati." },
+        "email_referente": { "type": ["string", "null"], "description": "Email del referente cliente." }
+      }
+    },
+    "evento": {
+      "type": "object",
+      "description": "Informazioni logistiche dal riquadro 'Consegna' e dalle note collegate.",
+      "properties": {
+        "nome_evento": { "type": ["string", "null"], "description": "Nome o tipo dell'evento (es. 'Cena di gala', 'Golosaria'). null se non scritto." },
+        "location": { "type": ["string", "null"], "description": "Luogo di consegna completo (nome location, via, città) come scritto. Non usare l'indirizzo di fatturazione del cliente." },
+        "citta": { "type": ["string", "null"], "description": "Città o comune della location di consegna." },
+        "zona_ztl_citata": {
+          "type": ["string", "null"],
+          "description": "Zona a traffico limitato citata ESPLICITAMENTE nel documento per la location (es. 'Area B', 'Area C', 'Città Alta'). Non dedurla dall'indirizzo: se non è scritta, null."
+        },
+        "mezzo_consegna": {
+          "type": ["string", "null"],
+          "enum": ["nostro", "cliente", "corriere", null],
+          "description": "Chi trasporta il materiale (campo 'Mezzo Consegna'): 'nostro' se a cura di Oltre Il Giardino, 'cliente' se ritira/porta il cliente, 'corriere' se trasportatore esterno."
+        },
+        "data_consegna": { "type": ["string", "null"], "description": "Data di consegna, formato AAAA-MM-GG." },
+        "ora_consegna": { "type": ["string", "null"], "description": "Ora di consegna o di inizio scarico, formato HH:MM. null se 'da definire' o assente." },
+        "pronto_entro": { "type": ["string", "null"], "description": "Scadenza entro cui l'allestimento deve essere pronto, formato AAAA-MM-GGTHH:MM (es. 'tutto pronto entro le 14.00 di venerdì 30/10'). null se assente." },
+        "data_inizio_evento": { "type": ["string", "null"], "description": "Primo giorno dell'evento se indicato, AAAA-MM-GG." },
+        "data_fine_evento": { "type": ["string", "null"], "description": "Ultimo giorno dell'evento se indicato, AAAA-MM-GG." },
+        "data_ritiro": { "type": ["string", "null"], "description": "Data di ritiro del materiale, formato AAAA-MM-GG." },
+        "ora_ritiro": { "type": ["string", "null"], "description": "Ora (o ora minima, es. 'dopo le 17:00') del ritiro, formato HH:MM." },
+        "servizio": {
+          "type": ["string", "null"],
+          "enum": ["solo_consegna", "consegna_e_allestimento", "ritiro_cliente", null],
+          "description": "'consegna_e_allestimento' se il documento cita montaggio/allestimento/smontaggio a cura nostra; 'solo_consegna' se solo trasporto; 'ritiro_cliente' se il cliente ritira in magazzino. null se non deducibile dal testo."
+        },
+        "referente_in_loco": { "type": ["string", "null"], "description": "Persona da contattare sul posto il giorno della consegna, se diversa dal referente cliente." },
+        "telefono_in_loco": { "type": ["string", "null"], "description": "Telefono del referente in loco." }
+      }
+    },
+    "articoli": {
+      "type": "array",
+      "description": "Righe della tabella articoli, una per riga. Ignorare intestazioni di colonna ripetute, subtotali, totali e righe vuote.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "categoria": { "type": ["string", "null"], "description": "Titolo della sezione a cui appartiene la riga (es. 'ARREDI', 'BANCONI'), maiuscolo come stampato." },
+          "codice": { "type": ["string", "null"], "description": "Codice articolo o posizione (colonna 'Pos'), esattamente come stampato." },
+          "descrizione": { "type": "string", "description": "Descrizione dell'articolo così come scritta." },
+          "quantita": { "type": ["number", "null"], "description": "Quantità (colonna 'Qta'), numero senza unità." },
+          "dimensioni": { "type": ["string", "null"], "description": "Dimensioni o misure se presenti nella descrizione (es. 'Ø180', '2,5 m', '5x5 m')." },
+          "alternativa": { "type": "boolean", "description": "true se la riga è marcata come alternativa/opzionale (colonna o dicitura 'Alt.'), altrimenti false." },
+          "note": { "type": ["string", "null"], "description": "Note della singola riga (colore, finitura, varianti)." }
+        },
+        "required": ["descrizione", "alternativa"]
+      }
+    },
+    "note_operative": {
+      "type": "array",
+      "description": "Frasi che riguardano la logistica: orari di accesso, montaggio, uscita mezzi, permessi, facchinaggio, piani, parcheggi, scarico. Una frase per elemento, testo come scritto. ESCLUDERE condizioni di pagamento, IBAN, prezzi e articoli del contratto generale (Art. 1, Art. 2, ...).",
+      "items": { "type": "string" }
+    },
+    "permessi": {
+      "type": "object",
+      "description": "Indicazioni sui permessi di accesso/sosta citate nel documento.",
+      "properties": {
+        "citati": { "type": "boolean", "description": "true se il documento menziona permessi, ZTL, occupazione suolo o pass di accesso." },
+        "a_carico_di": { "type": ["string", "null"], "enum": ["cliente", "noi", null], "description": "Chi deve procurare i permessi secondo il testo; null se non specificato." },
+        "testo": { "type": ["string", "null"], "description": "Frase originale che parla dei permessi." }
+      }
+    },
+    "avvisi": {
+      "type": "array",
+      "description": "Dati ambigui, contraddittori o non leggibili. Ogni elemento: nome del campo e motivo (es. 'ora_consegna: scritto ORARI DIURNI DA DEFINIRE'). Vuoto se tutto è chiaro.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "campo": { "type": "string" },
+          "motivo": { "type": "string" }
+        },
+        "required": ["campo", "motivo"]
+      }
+    }
+  },
+  "required": ["numero_offerta", "cliente", "evento", "articoli", "note_operative", "avvisi"]
+}

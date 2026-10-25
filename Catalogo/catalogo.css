@@ -1,0 +1,129 @@
+/* ===== aggiunte del Catalogo (sopra lo stile condiviso con la Logistica) ===== */
+.link{border:0; background:none; padding:0; color:var(--accent-ink); cursor:pointer; font:inherit; text-decoration:underline; text-underline-offset:2px}
+.side-foot strong{color:var(--fg)}
+.sec{display:block}
+.drawer{width:min(760px,100vw)}
+.view{overflow:auto}
+/* accesso */
+body.no-auth{background:linear-gradient(160deg,var(--bg),oklch(93% 0.03 150))}
+.login{min-height:100vh; display:grid; place-items:center; padding:24px}
+.login-card{width:min(640px,100%); padding:32px; text-align:center; display:grid; gap:14px; justify-items:center}
+.login-card h1{font-size:34px}
+.login-sso{display:grid; gap:6px; justify-items:center}
+.ruoli{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; width:100%; text-align:left}
+.ruolo{text-align:left; justify-items:start; display:grid; gap:2px; padding:12px 14px; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); cursor:pointer; transition:border-color 140ms, background 140ms}
+.ruolo:hover{border-color:var(--accent); background:var(--accent-soft)}
+.ruolo svg{color:var(--accent-ink)}
+/* filtri e griglia */
+.filtri-col{display:grid; gap:10px}
+.filtri{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.filtri input[type=search]{max-width:340px; min-height:32px}
+.seg-sm button{padding:4px 10px; min-height:26px; font-size:12px; text-transform:none}
+.seg.k1{flex-wrap:wrap; border-radius:12px}
+.seg.k1 button{text-transform:capitalize}
+.seg-n{font-family:var(--font-mono); font-size:10.5px; opacity:.7}
+.colfil{gap:4px}
+.swb{border:2px solid transparent; border-radius:50%; padding:1px; background:none; cursor:pointer}
+.swb.on{border-color:var(--accent)}
+.sw{display:inline-block; width:14px; height:14px; border-radius:50%; background:var(--sw); box-shadow:inset 0 0 0 1px oklch(0% 0 0 / .18); flex:none}
+.sw.big{width:22px; height:22px}
+.dt-filtri{padding:12px 14px; border-bottom:1px solid var(--border)}
+.pgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; padding:14px}
+.pc{display:flex; flex-direction:column; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); padding:0; text-align:left; cursor:pointer; overflow:hidden; transition:border-color 140ms, box-shadow 140ms}
+.pc:hover{border-color:var(--accent); box-shadow:0 4px 14px oklch(0% 0 0 / .07)}
+.pc-b{padding:10px 12px 12px; display:grid; gap:6px}
+.pc-t{font-size:13px; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.6em}
+.bar-c{height:4px; border-radius:2px; background:var(--sunken); overflow:hidden}
+.bar-c b{display:block; height:100%; background:var(--accent)}
+.dt-piede{display:flex; align-items:center; gap:12px; padding:8px 14px; border-top:1px solid var(--border); font-size:12px; color:var(--muted)}
+.dt-pag{margin-left:auto; display:flex; gap:2px}
+.dt-pag button{min-width:28px; height:28px; border:1px solid transparent; border-radius:6px; background:none; cursor:pointer; font-size:12px}
+.dt-pag button.on{border-color:var(--accent); color:var(--accent-ink); font-weight:600}
+.dt-pag button:disabled{opacity:.35}
+/* segnaposto foto */
+.ph{position:relative; aspect-ratio:4/3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:radial-gradient(circle at 50% 42%, var(--ph) 0 28%, color-mix(in oklch, var(--ph) 22%, var(--sunken)) 29%); color:oklch(25% 0 0 / .65); text-align:center}
+.ph span{font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; background:oklch(100% 0 0 / .75); padding:1px 6px; border-radius:4px; margin-top:58%}
+.ph small{font-size:10px}
+.ph.has-img{background:#f6f6f4}
+.ph.has-img img{width:100%; height:100%; object-fit:contain}
+.ph.big{width:200px; flex:none; border-radius:var(--r-lg); overflow:hidden}
+.ph.sm{width:120px; border-radius:var(--r)}
+.ph.xs{width:52px; flex:none; border-radius:6px}
+.ph.xs span,.ph.xs small,.ph.sm small{display:none}
+/* scheda */
+.sch-top{display:flex; gap:16px; align-items:flex-start}
+.sch-check{display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:8px; font-size:12px; color:var(--muted)}
+.sch-check .ok{color:var(--ok)}
+.sec-head{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.var{display:flex; flex-wrap:wrap; gap:6px}
+.vb{display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface); cursor:pointer; font-size:12px}
+.vb.on{border-color:var(--accent); background:var(--accent-soft)}
+.tagset{display:flex; flex-wrap:wrap; gap:5px}
+.tg{padding:3px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface); font-size:12px; cursor:pointer}
+.tg.on{background:var(--accent-ink); border-color:var(--accent-ink); color:var(--on-accent)}
+.tg-l{margin:10px 0 6px}
+.fgrid.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.fgrid.one{grid-template-columns:1fr}
+.addc{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap}
+.addc select{width:auto}
+.addc input#nc-desc{flex:1; min-width:200px}
+.fotos{display:flex; flex-wrap:wrap; gap:10px}
+.fotos figure{margin:0; width:120px; display:grid; gap:3px}
+.fotos img{width:120px; height:90px; object-fit:contain; background:#f6f6f4; border-radius:var(--r); border:1px solid var(--border)}
+.fotos figure.main img{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+.fotos figcaption{overflow-wrap:anywhere}
+.fold{border:1px solid var(--border); border-radius:var(--r); background:var(--surface)}
+.fold > summary{display:flex; align-items:center; gap:8px; padding:9px 12px; cursor:pointer; list-style:none; font-size:12.5px; font-weight:600; color:var(--muted)}
+.fold > summary::-webkit-details-marker{display:none}
+.fold[open] > summary svg{transform:rotate(90deg)}
+.fold-body{padding:0 12px 12px; display:grid; gap:8px}
+.standby{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px dashed oklch(47% 0.13 250 / .45); border-radius:var(--r); background:oklch(47% 0.13 250 / .05); font-size:12.5px; color:var(--muted)}
+.standby strong{color:var(--fg)}
+dialog.confirm{width:min(440px,94vw)}
+/* telefono */
+.cens{display:grid; grid-template-columns:auto minmax(0,1fr); gap:24px; align-items:start}
+.phone{width:380px; height:760px; border-radius:46px; background:#151515; padding:14px; box-shadow:0 20px 50px oklch(0% 0 0 / .25); position:relative}
+.phone-notch{position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:24px; background:#151515; border-radius:0 0 14px 14px; z-index:2}
+.phone-scr{height:100%; border-radius:34px; background:var(--bg); overflow:auto; display:flex; flex-direction:column}
+.m-head{position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:8px; padding:36px 16px 12px; background:var(--surface); border-bottom:1px solid var(--border); font-size:16px}
+.m-back{border:0; background:none; font-size:26px; line-height:1; cursor:pointer; color:var(--accent-ink); padding:0 6px 0 0}
+.m-body{padding:16px; display:grid; gap:12px}
+.m-opt{display:grid; gap:2px; padding:16px; border:1px solid var(--border); border-radius:16px; background:var(--surface); text-align:left; cursor:pointer}
+.m-opt:hover{border-color:var(--accent)}
+.m-coda{text-align:center}
+.m-shot{display:grid; justify-items:center; gap:6px; padding:34px 12px; border:2px dashed var(--border-strong); border-radius:18px; background:var(--surface); color:var(--accent-ink); cursor:pointer}
+.m-thumbs{display:flex; flex-wrap:wrap; gap:8px}
+.m-th{position:relative}
+.m-th img{width:96px; height:96px; object-fit:cover; border-radius:12px}
+.m-th button{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; border:0; background:var(--fg); color:#fff; cursor:pointer}
+.m-next{width:100%; min-height:46px; font-size:15px}
+.m-list,.m-sim{display:grid; gap:6px}
+.m-it{display:flex; gap:10px; align-items:center; padding:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); text-align:left; cursor:pointer}
+.m-it > span{display:grid; gap:2px; min-width:0}
+.m-it strong{font-size:13px}
+.m-imgs{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.m-imgs figure{margin:0; display:grid; gap:2px; text-align:center}
+.m-imgs img{width:100%; aspect-ratio:1; object-fit:cover; border-radius:12px; background:#eee}
+.m-wait{justify-items:center; text-align:center; padding-top:120px}
+.spin{width:44px; height:44px; border-radius:50%; border:4px solid var(--border); border-top-color:var(--accent); animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.m-ok{width:72px; height:72px; border-radius:50%; display:grid; place-items:center; background:var(--accent-soft); color:var(--accent-ink)}
+.steps-l{padding-left:18px; display:grid; gap:6px; margin:8px 0 14px}
+/* revisione, prompt, import, api */
+.rev-list{display:grid; gap:12px}
+.rev-it{display:flex; gap:14px; padding:12px; align-items:flex-start}
+.rev-it .ph{width:140px; flex:none; border-radius:var(--r); overflow:hidden}
+.rev-act{display:grid; gap:6px}
+.ptwo{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:16px; align-items:start}
+.plist{display:grid}
+.pitem{padding:12px 16px; border-bottom:1px solid var(--border); display:grid; gap:6px}
+.imp{display:grid; gap:8px}
+.codes{display:flex; flex-wrap:wrap; gap:4px 10px}
+.json{margin:0; padding:14px 16px; font-family:var(--font-mono); font-size:12px; background:var(--sunken); overflow:auto; max-height:420px; white-space:pre}
+@media (max-width:1100px){ .cens,.ptwo{grid-template-columns:1fr} .fgrid.g4{grid-template-columns:repeat(2,minmax(0,1fr))} }
+/* su un telefono vero il censimento occupa tutto lo schermo */
+@media (max-width:640px){
+  .cens-note{display:none} .phone{width:100%; height:auto; min-height:calc(100vh - 140px); padding:0; border-radius:0; background:none; box-shadow:none}
+  .phone-notch{display:none} .phone-scr{border-radius:0} .m-head{padding-top:12px}
+  .sch-top{flex-direction:column} .ph.big{width:100%} .ruoli{grid-template-columns:1fr}
+}
