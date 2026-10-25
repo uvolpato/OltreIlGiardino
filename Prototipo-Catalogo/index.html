@@ -147,6 +147,10 @@ tr.click:hover{background:var(--hover)}
 .tabbar button{border:0; background:none; padding:12px 10px 10px; cursor:pointer; color:var(--muted); font-size:13px; font-weight:500; border-bottom:2px solid transparent; transition:color 140ms}
 .tabbar button:hover{color:var(--fg)}
 .tabbar button[aria-selected="true"]{color:var(--fg); border-bottom-color:var(--accent)}
+/* registro modifiche */
+.reg{list-style:none; margin:0; padding:0; display:grid}
+.reg li{display:flex; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border)}
+.reg li.annullata{opacity:.55} .reg li.annullata .grow>div:first-child{text-decoration:line-through}
 .empty{padding:36px 20px; text-align:center; color:var(--muted); font-size:13px}
 .meter{width:72px; height:6px; border-radius:999px; background:var(--sunken); overflow:hidden; display:inline-block; vertical-align:middle}
 .meter b{display:block; height:100%; background:var(--accent)}
@@ -161,8 +165,9 @@ tr.click:hover{background:var(--hover)}
 .g-head{position:sticky; top:0; z-index:8; background:var(--surface)}
 .g-corner{position:sticky; left:0; z-index:2; background:var(--sunken); border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:0 14px; display:flex; align-items:center}
 .g-scale{position:relative; height:66px; background:var(--sunken); border-bottom:1px solid var(--border)}
-.g-scale .mb{position:absolute; top:0; height:22px; display:flex; align-items:center; justify-content:center; overflow:hidden; white-space:nowrap;
-  font-size:11px; font-weight:600; letter-spacing:.02em; color:oklch(32% 0.09 var(--h)); background:oklch(91% 0.055 var(--h)); border-right:1px solid var(--surface); box-shadow:inset 0 -1px 0 oklch(80% 0.07 var(--h))}
+.g-mbar{display:flex; height:22px; width:100%}
+.mbseg{flex:0 0 auto; height:22px; position:relative; display:flex; align-items:center; background:oklch(91% 0.055 var(--h)); border-right:1px solid var(--surface); box-shadow:inset 0 -1px 0 oklch(80% 0.07 var(--h))}
+.mb-lab{position:sticky; left:var(--lw); padding:0 10px; font-size:11px; font-weight:600; letter-spacing:.02em; color:oklch(32% 0.09 var(--h)); white-space:nowrap}
 .g-scale .tk{position:absolute; top:22px; bottom:0; border-left:1px solid var(--border); padding:6px 0 0 6px; font-family:var(--font-mono); font-size:11px; color:var(--muted); white-space:nowrap}
 .g-scale .tk b{display:block; font-family:var(--font-sans); font-size:12.5px; color:var(--fg); font-weight:600}
 .g-scale .tk.today b{color:var(--accent-ink)}
@@ -303,16 +308,50 @@ body.panning .gscroll, body.panning .gscroll *{cursor:grabbing !important; user-
 .sheet td{font-size:12.5px}
 .sheet td.who{min-width:150px}
 td.mono{white-space:nowrap}
-.sheet .need{color:var(--danger); font-weight:600}
+.sheet .need,.mag-sheet .need{color:var(--danger); font-weight:600}
+/* report cartacei di magazzino */
+.print-only{display:none}
+.mag-list{display:grid; gap:14px}
+.mag-sheet{padding:16px 18px; display:grid; gap:12px}
+.mag-h{display:flex; align-items:flex-start; gap:12px}
+.mag-h h3{margin:2px 0 0; font-size:16px}
+.mag-h .mono{font-size:18px; font-weight:700}
+.mag-info{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:6px 18px; margin:0}
+.mag-info dt{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+.mag-info dd{margin:0; font-size:13px}
+.mag-t{width:100%; border-collapse:collapse; font-size:13px}
+.mag-t th,.mag-t td{border:1px solid var(--border); padding:6px 8px; text-align:left}
+.mag-t th{background:var(--sunken); font-size:11.5px}
+.mag-t .num{text-align:right; font-family:var(--font-mono)}
+.mag-t .pen{width:90px} .mag-t .pen.c{text-align:center; font-size:16px; color:var(--muted)}
+.mag-firma{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); padding-top:6px}
 
-/* ---------- drawer & dialog ---------- */
-.scrim{position:fixed; inset:0; z-index:40; background:oklch(20% 0.015 145 / .3); opacity:0; pointer-events:none; transition:opacity 200ms}
+/* ---------- drawer & dialog (pannello dettaglio centrato) ---------- */
+.scrim{position:fixed; inset:0; z-index:40; background:oklch(15% 0.02 145 / .45); opacity:0; pointer-events:none; transition:opacity 200ms}
 .scrim.open{opacity:1; pointer-events:auto}
-.drawer{position:fixed; top:0; right:0; bottom:0; z-index:50; width:min(540px,100vw); background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; transform:translateX(100%); visibility:hidden; transition:transform 240ms var(--ease), visibility 0s 240ms}
-.drawer.open{transform:none; visibility:visible; transition:transform 240ms var(--ease)}
-.drawer-head{padding:18px 20px 14px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:flex-start}
-.drawer-head h2{font-family:var(--font-display); font-size:20px}
-.drawer-body{padding:18px 20px 32px; overflow:auto; display:flex; flex-direction:column; gap:22px}
+.drawer{position:fixed; inset:0; z-index:50; width:min(1320px,calc(100vw - 48px)); height:calc(100vh - 48px); margin:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); box-shadow:0 24px 80px oklch(0% 0 0 / .18); display:flex; flex-direction:column; overflow:hidden; transform:scale(.97); opacity:0; visibility:hidden; transition:transform 220ms var(--ease), opacity 180ms ease, visibility 0s 220ms}
+.drawer.open{transform:none; opacity:1; visibility:visible; transition:transform 220ms var(--ease), opacity 180ms ease}
+.drawer-head{padding:18px 22px 14px; border-bottom:1px solid var(--border); display:flex; gap:16px; align-items:flex-start; flex-shrink:0}
+.drawer-head h2{font-family:var(--font-display); font-size:22px; line-height:1.25}
+.drawer-head .eyebrow{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px}
+.drawer-body{padding:0; overflow:auto; display:flex; flex-direction:column; flex:1; min-height:0}
+.drawer-body > .detail-layout{flex:1}
+.drawer-foot{padding:14px 22px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-shrink:0; background:var(--sunken)}
+.drawer-foot .btn{min-height:36px}
+.detail-layout{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:22px; padding:22px; align-content:start}
+.detail-full{grid-column:1/-1; display:flex; flex-direction:column; gap:16px}
+.detail-main,.detail-side{display:flex; flex-direction:column; gap:18px}
+.detail-section{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:16px; display:flex; flex-direction:column; gap:12px}
+.detail-section > .eyebrow{margin:0}
+.detail-section > .sec-head{margin:0}
+.drawer .people{margin:0}
+.drawer .seq{padding-bottom:6px}
+.drawer .seq-i{flex-basis:110px}
+@media (max-width:1024px){
+  .drawer{width:100vw; height:100vh; max-height:none; border-radius:0; margin:0; inset:0}
+  .detail-layout{grid-template-columns:1fr; padding:16px; gap:16px}
+  .drawer-foot{position:sticky; bottom:0}
+}
 .sec > .eyebrow{margin-bottom:8px}
 .sec-head{display:flex; align-items:center; gap:8px; margin-bottom:8px; min-height:30px}
 .ui-head{display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:var(--r-lg); background:var(--sunken)}
@@ -336,6 +375,80 @@ td.mono{white-space:nowrap}
 .fold-body{padding:0 12px 12px; display:grid; gap:10px}
 .sec .fold{margin-top:10px}
 dialog.confirm{width:min(440px,94vw)}
+/* dialog di inserimento/modifica dati (anagrafiche, stima): larghezza moderata, non "wide" */
+dialog.form{width:min(760px,94vw); max-height:92vh}
+dialog.form .dlg-body{padding:20px 24px}
+dialog.form .fgrid{grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px}
+dialog.form .fgrid .full{grid-column:1/-1}
+/* etichette di ambito per i pannelli di dettaglio: ordine (fisso) vs tratta vs task */
+.scope{display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:2px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap}
+.scope.ordine{color:var(--accent-ink); border-color:var(--accent); background:var(--accent-soft)}
+.scope.tratta{color:var(--ok); border-color:var(--ok); background:oklch(46% 0.13 150 / .1)}
+.scope.task,.scope.piano{color:var(--info); border-color:var(--info); background:oklch(47% 0.13 250 / .1)}
+.scope.avvisi{color:var(--warn); border-color:var(--warn); background:oklch(50% 0.13 70 / .1)}
+.det-panel{overflow:hidden}
+.det-panel.det-ordine{border-left:3px solid var(--accent)}
+.det-panel.det-tratta{border-left:3px solid var(--ok)}
+.det-panel.det-task,.det-panel.det-piano{border-left:3px solid var(--info)}
+.det-panel.det-avvisi{border-left:3px solid var(--warn)}
+.det-panel .card-head{gap:10px}
+.det-panel .card-head h2{font-size:14px}
+/* multi-selezione a checkbox (ruoli, patenti, certificazioni) */
+.chipgroup{display:flex; flex-wrap:wrap; gap:8px}
+.chk{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface); cursor:pointer; font-size:13px; transition:border-color 140ms, background 140ms}
+.chk:hover{border-color:var(--accent)}
+.chk input{width:auto; min-height:0; accent-color:var(--accent)}
+.chk:has(input:checked){border-color:var(--accent); background:var(--accent-soft)}
+/* editor assenze/ferie nei moduli */
+/* elenchi ad altezza fissa (~3 righe, poi scroll): il dialog non cambia dimensione aggiungendo righe */
+.ass-list{display:flex; flex-direction:column; gap:8px; height:158px; overflow:auto; padding-right:4px; scrollbar-width:thin}
+.ae-pane[data-pane="arch"] .ass-list{height:380px}
+.ass-row{border:1px solid var(--border); border-radius:var(--r); padding:6px 8px 6px 10px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; background:var(--surface)}
+.ass-row.bad{border-color:var(--danger)}
+.ass-row.hot{animation:hot 1.6s ease-out}
+.ass-row select{width:auto; min-height:32px}
+.ass-row input{min-height:32px; padding:4px 8px; font-size:12.5px; width:auto; min-width:118px}
+.ass-dur{min-width:64px; text-align:right; font-family:var(--font-mono); font-size:11.5px; color:var(--muted)}
+.ass-msg{flex-basis:100%; font-size:12px}
+.ass-msg:empty{display:none}
+.t-warn{color:var(--warn)}
+/* dialog addetto: schede + disponibilità */
+dialog.form.ae{width:min(980px,94vw)}
+.ae .tabbar{padding:0 16px}
+/* schede nei dialog: tutte nella stessa cella della griglia, quindi il dialog è alto quanto la scheda più grande
+   e non cambia dimensione passando da una scheda all'altra (le nascoste restano in layout ma invisibili) */
+.panes{display:grid}
+.panes>*{grid-area:1/1; min-width:0; display:block}
+/* data-off (non hidden: [hidden] è display:none globale) */
+.panes>[data-off]{visibility:hidden}
+.tab-n{margin-left:6px; padding:0 6px; border-radius:999px; background:var(--accent-soft); color:var(--accent-ink); font:700 10px/1.6 var(--font-mono)}
+.tab-n[hidden]{display:none}
+.tab-n.warn{background:oklch(50% 0.13 70 / .14); color:var(--warn)}
+.stars{display:inline-flex; flex-direction:row-reverse; justify-content:flex-end; gap:2px}
+.stars label{position:relative; padding:2px; font-size:24px; line-height:1; color:var(--border-strong); cursor:pointer; border-radius:4px}
+.stars input{position:absolute; opacity:0; width:1px; height:1px}
+.stars label:has(input:checked),.stars label:has(input:checked)~label{color:oklch(74% 0.15 80)}
+.stars label:has(input:focus-visible){outline:2px solid var(--accent)}
+.ae-bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.ae-bar b{min-width:130px; text-align:center; font-size:14px}
+.ae-tl{--lw:150px; border:1px solid var(--border); border-radius:var(--r); overflow:hidden}
+.ae-tl .gscroll{height:228px}
+.ae-me .g-track{cursor:crosshair; user-select:none; touch-action:none}
+.ae-sel{position:absolute; top:4px; bottom:4px; z-index:3; display:flex; align-items:center; padding:0 6px; border:1.5px dashed var(--accent); border-radius:5px; background:var(--accent-soft); color:var(--accent-ink); font-size:11px; white-space:nowrap; pointer-events:none}
+.ae-sel[hidden]{display:none}
+.off[data-act]{cursor:pointer}
+.off[data-act]:hover{color:var(--danger); border-color:var(--danger)}
+/* griglia delle tabelle di lookup */
+.lk-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px}
+@media (max-width:1024px){.lk-grid{grid-template-columns:1fr}}
+/* ---------- aiuti contestuali (tooltip) ---------- */
+.hint{display:inline-grid; place-items:center; width:20px; height:20px; padding:0; border:1px solid var(--border); border-radius:50%; background:var(--sunken); color:var(--muted); cursor:help; font-size:11px; line-height:1; flex:none; transition:border-color 140ms, color 140ms, background 140ms}
+.hint:hover,.hint:focus-visible{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); outline:none}
+.hint-tip{position:fixed; z-index:90; max-width:320px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r); background:var(--fg); color:var(--surface); box-shadow:0 12px 32px oklch(0% 0 0 / .22); font-size:12.5px; line-height:1.45}
+.hint-tip b{color:var(--accent)}
+.hint-tip[hidden]{display:none}
+
+
 .btn-danger{background:var(--danger); border-color:var(--danger); color:#fff}
 .btn-danger:hover{background:oklch(44% 0.18 27); border-color:oklch(44% 0.18 27)}
 .comp-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(420px,1fr)); gap:16px; align-items:start}
@@ -502,6 +615,8 @@ table.dt tfoot td{font-weight:600; border-top:1px solid var(--border-strong); ba
   .view{padding:0; animation:none}
   .card{border-color:#999; break-inside:avoid}
   th{background:#eee}
+  .print-only{display:block}
+  .mag-sheet{break-inside:avoid; box-shadow:none} .mag-list{gap:8mm} .mag-title{margin-bottom:4mm; font-size:14px} .mag-t th,.mag-t td{border-color:#666}
 }
 
 /* ===== aggiunte del Catalogo (sopra lo stile condiviso con la Logistica) ===== */
@@ -647,6 +762,8 @@ dialog.confirm{width:min(440px,94vw)}
 </aside>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="assets/articoli.js"></script>
+<!-- listino completo (escluso da git) se presente in locale, altrimenti la copia pubblicabile (Catalogo/pubblica.py) -->
+<script>if(!window.CAT) document.write('<script src="assets/articoli-demo.js"><'+'/script>');</script>
 <script>
 "use strict";
 /* ============================================================

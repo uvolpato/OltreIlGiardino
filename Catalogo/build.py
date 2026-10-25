@@ -33,6 +33,8 @@ html = f"""<!doctype html>
 </aside>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="assets/articoli.js"></script>
+<!-- listino completo (escluso da git) se presente in locale, altrimenti la copia pubblicabile (Catalogo/pubblica.py) -->
+<script>if(!window.CAT) document.write('<script src="assets/articoli-demo.js"><'+'/script>');</script>
 <script>
 {(QUI / "app.js").read_text(encoding="utf-8")}
 </script>
