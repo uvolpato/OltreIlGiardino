@@ -14,6 +14,7 @@
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Ugo | Prima bozza dalle richieste del 20/10 |
 | 0.2 | 2026-10-21 | Ugo | Analisi del file articoli IBED (§2bis); codici, classificazioni, colori e varianti allineati ai dati reali |
+| 0.3 | 2026-10-26 | Ugo | Nome della piattaforma: **Oltre Il Giardino** (non «Serra»). Prototipo allineato alla suite: stessi componenti della Logistica; scheda articolo a schede con riepilogo fisso, responsive (§5.7) |
 
 ---
 
@@ -44,7 +45,9 @@ Il nome deve funzionare come "contenitore" (la piattaforma) e lasciare alle sezi
 | **Radici** | La "fonte di verità" da cui tutto parte. | Suona astratto per un'app operativa. |
 | **OIG Hub** / **OIG Studio** | Neutro, richiama il marchio. | Generico, poco memorabile. |
 
-**Consiglio:** **Serra** per la piattaforma; sezioni "Logistica", "Catalogo", "Magazzino". In alternativa, **Vivaio** se si preferisce dare un nome proprio al catalogo dentro una piattaforma "OIG".
+**Decisione (26/10/2026):** la piattaforma si chiama **Oltre Il Giardino**, con le sezioni "Logistica", "Catalogo", "Magazzino"; le proposte qui sopra restano come storico.
+
+**Consiglio iniziale:** **Serra** per la piattaforma; sezioni "Logistica", "Catalogo", "Magazzino". In alternativa, **Vivaio** se si preferisce dare un nome proprio al catalogo dentro una piattaforma "OIG".
 
 ---
 
@@ -277,13 +280,20 @@ Il magazzino misura; il censimento da foto lascia questi campi **da completare**
 
 **Web (desktop):**
 - *Catalogo:* griglia con foto, filtri per funzione, stile, tema, colore (selettore colore), stato, completezza.
-- *Scheda articolo:* galleria (originali ed elaborate), descrizioni, colori, tassonomie, misure, composizione e varianti, storico modifiche, "dove è usato" (offerte, configurazioni).
+- *Scheda articolo:* modale larga (fino a 1520 px). A sinistra un **riepilogo sempre visibile**: foto, stato, codice, classe, colore, varianti e completezza della scheda con le voci mancanti, cliccabili. A destra sei schede, ciascuna con il numero di dati mancanti:
+  1. *Descrizione*: nome, descrizione, descrizione breve ERP (max 40), classe, sottoclasse, tipo, colore.
+  2. *Uso negli eventi*: funzione, temi, stile, caratteristiche.
+  3. *Misure*: dimensioni da montato, trasporto (volume, peso, pila, persone), tempi.
+  4. *Composizione*: componenti e "usato come componente in".
+  5. *Foto e colori*: originali ed elaborate, colori RGB rilevati.
+  6. *ERP e storico*: dati commerciali in sola lettura, significato del codice, storico modifiche.
+  Sotto 1024 px la scheda occupa lo schermo e il riepilogo va in alto; sotto 600 px diventa compatto.
 - *Revisione:* coda degli articoli "Da revisionare" con confronto proposta AI / valori attuali.
 - *Prompt:* libreria dei prompt standard e personali, con anteprima.
 - *Importazione:* caricamento dell'Excel attuale con mappatura colonne.
 - *Amministrazione:* ruoli, tassonomie, chiavi API.
 
-Coerenza con il prototipo logistico: stessi componenti (`datatable`, `filtri`, `stato`, `dettagli`, `sequenza`…).
+**Coerenza con la suite:** il catalogo è un'app della stessa suite della Logistica e deve apparire uguale in ogni aspetto grafico e di interazione. Nel prototipo `Catalogo/build.py` copia dalla Logistica stile e libreria dei componenti (`datatable`, `filtri`, `pannello`, `dettagli`, `conferma`, `toast`, aiuti «?»): tabelle come datatable, una sola azione primaria in alto a destra, conferme e dialog uguali, azioni nel piede delle modali (Chiudi a sinistra, azioni a destra).
 
 ### 5.8 Distribuzione: API REST e MCP
 
@@ -402,7 +412,7 @@ Crediamo che, permettendo a chi vede gli oggetti di censirli con una foto e lasc
 
 | Domanda | Per chi |
 |---|---|
-| Nome della piattaforma (proposta: **Serra**) | Direzione |
+| ~~Nome della piattaforma~~ — deciso il 26/10/2026: **Oltre Il Giardino** | Direzione |
 | ~~Quanti articoli e con quali colonne?~~ **Risposto**: 2.194 articoli, 26 colonne (§2bis). Resta: chi lo aggiorna e ogni quanto? | Chi gestisce il catalogo |
 | erpCUBE: l'anagrafica è già caricata da questo file? Si può leggere/scrivere via API o solo con import/export? | Amministrazione / IBED |
 | Dove sono le **foto** (cartella con i 2.194+ file indicati nel file)? | Chi gestisce il catalogo |

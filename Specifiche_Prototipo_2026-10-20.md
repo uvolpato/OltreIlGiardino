@@ -1,6 +1,6 @@
 # Pianificatore Logistica — Specifiche dal prototipo
 
-**Data:** 20/10/2026 · **Stato:** decisioni di lavoro, da validare con Logistica (Fabiana) e magazzino
+**Data:** 20/10/2026, aggiornato al 26/10/2026 · **Stato:** decisioni di lavoro, da validare con Logistica (Fabiana) e magazzino
 **Riferimenti:** `PRD_Pianificatore_Logistica.md` (perché e per chi) · `Documento_Tecnico_Sistema.md` (architettura) · questo documento (cosa fa l'app, regole e decisioni prese costruendo il prototipo)
 
 Il prototipo è `Prototipo/index.html`: un solo file, si apre con doppio clic, senza installazione. Serve internet solo per mostrare i PDF (pdf.js da CDN). Tutto lo stato è in memoria: ricaricando la pagina si riparte dai dati di esempio.
@@ -9,7 +9,40 @@ Il prototipo è `Prototipo/index.html`: un solo file, si apre con doppio clic, s
 
 ---
 
-## 0. Aggiornamenti 25/10/2026
+## 0. Aggiornamenti 26/10/2026
+
+Lavoro dei giorni 25–26/10. Le voci 13, 15 e 16 della tabella del 25/10 sono superate dai punti qui sotto.
+
+| # | Cosa è cambiato | Dettaglio |
+|---|---|---|
+| 1 | **Dialog addetto a schede** | Schede Anagrafica, Competenze, Disponibilità, Archivio. Il dialog ha la dimensione della scheda più grande e non cambia passando da una all'altra (classe `.panes`: tutte le schede nella stessa cella della griglia, le inattive con `data-off`). Tipo risorsa a scelta (Interno/Cooperativa, il campo Cooperativa compare solo se serve), valutazione a stelle, nome obbligatorio. |
+| 2 | **Disponibilità con timeline del mese** | Timeline adattata alla larghezza del dialog, con frecce ‹ › e «Oggi». Prima riga sempre l'addetto in modifica, sotto **tutti i colleghi con assenze nel mese mostrato**. Stessa grafica del Gantt (fasce grigie tratteggiate). Trascinando sulla prima riga si crea una ferie. Legge le assenze **in modifica**, non quelle salvate. Timeline ed elenco mostrano circa 3 righe, poi scorrono. |
+| 3 | **Assenze: in programma e archivio** | La scheda Disponibilità elenca solo le assenze in corso o future; quelle concluse vanno nella scheda **Archivio**. Ogni riga mostra la durata e chi altro è assente negli stessi giorni. Non si salva con date incoerenti, assenze sovrapposte o date mancanti. |
+| 4 | **Dialog mezzo con la stessa struttura** | Schede Dati, **Scadenze** (revisione, assicurazione, bollo, tagliando: arancione entro 30 giorni, rosso se scaduta), Disponibilità (**fermi**: manutenzione, revisione, tagliando, guasto, noleggiato a terzi), Archivio. In timeline, sotto il mezzo, i mezzi **dello stesso tipo** fermi nel mese; ogni fermo indica i sostituti liberi. Editor comune ad addetti e mezzi (configurazione `DISP`). |
+| 5 | **Stato del mezzo calcolato dai fermi** | Il campo `stato` non si sceglie più a mano: `statoMezzi()` lo calcola da `fermi` per oggi; i controlli usano `fermo(m, s, e)` sulle date reali (proposte di flotta, avvisi, dettaglio tratta, foglio del giorno). Nel Gantt per risorsa i fermi sono fasce datate. La lookup «Stati mezzi» è diventata «Tipi di fermo mezzo». Scadenze superate o vicine compaiono come etichette nell'elenco mezzi. |
+| 6 | **Magazzino: report cartacei per ordine** | Due report, una scheda per ordine: **Da preparare per domani** (carichi del giorno successivo, con persone schedulate sul carico, mezzo, partenza, location/ZTL, articoli con caselle Preparato/Caricato) e **Rientri attesi** (rientri e riconsegne del giorno, con colonne Rientrati/Danneggiati/Mancanti). Note e firma in fondo; «da assegnare» in rosso se mancano persone o mezzo. «Stampa» stampa solo le schede; CSV con le righe articolo. |
+| 7 | **Registro modifiche e Ctrl+Z** | Ogni modifica al piano è una voce del registro (ora, descrizione, ordini toccati, copia degli ordini prima della modifica). **Ctrl+Z** annulla l'ultima. Annullare una voce annulla anche **tutte le successive sugli stessi ordini**, a catena, con conferma che le elenca; le altre restano. Voci annullate barrate. Registro generale (icona orologio in alto) o per ordine (pulsante nel dettaglio). Non c'è «rifai». |
+| 8 | **Salvataggio** | Nel piano ogni modifica si applica subito (non c'è un Salva); il puntino bianco su una barra = task modificato a mano, il pallino arancione nella sequenza = conflitto. Anagrafiche, ferie e fermi si salvano con il pulsante Salva del loro dialog e non passano dal registro. |
+| 9 | **Modale dettaglio ordine più larga** | Fino a 1320 px e tutta l'altezza dello schermo. |
+| 10 | **Zoom nei dialog** | Ctrl + rotella dentro un dialog non zooma più la Pianificazione sottostante. |
+| 11 | **Dati dimostrativi su 20 giorni** | 20/10 – 08/11, con un caso per ogni avviso (elenco e date nella guida `Guida_Prototipo.md`). Assenze e fermi sono inseriti prima delle proposte, alcune assegnazioni sbagliate sono volute. |
+| 12 | **Offerte anonimizzate per la demo pubblica** | `Estrazione/anonimizza.py` crea `Prototipo/assets/offerte-demo/`: nei PDF cliente, referenti, contatti, P.IVA, IBAN e prezzi sono redatti davvero (testo rimosso), nell'indice sostituiti da nomi di fantasia. Il prototipo usa `assets/offerte/` se c'è (locale) altrimenti `offerte-demo/` (GitHub Pages). |
+
+### Catalogo prodotti: app della stessa suite
+
+| # | Cosa è cambiato | Dettaglio |
+|---|---|---|
+| 1 | **Stessi componenti della Logistica** | `Catalogo/build.py` copia a ogni build dal prototipo Logistica (che non si modifica) lo stile e la libreria: `esc`, dialog, icone, `UI` (pannelli, tabelle, `datatable`, `filtri`, `conferma`…), `toast`, aiuti «?». `Catalogo/app.js` usa solo quei componenti. |
+| 2 | **Datatable ovunque** | Catalogo in vista tabella, Revisione, Prompt, anomalie dell'Import: ricerca, segmenti con conteggi, ordinamento, pagine. La griglia usa la stessa paginazione. |
+| 3 | **Layout e interazioni uguali** | Barra laterale con riquadro di stato, intestazione con titolo e «?», **una sola azione primaria in alto a destra** per vista; conferme con `UI.conferma` (azzera, elimina prompt, togli componente, rimanda scheda); dialog di inserimento come le anagrafiche. |
+| 4 | **Scheda articolo riorganizzata** | Modale larga fino a 1520 px. A sinistra un **riepilogo fisso** (foto, stato, codice, classe, colore, varianti, completezza con le voci mancanti cliccabili); a destra **6 schede**: Descrizione, Uso negli eventi, Misure, Composizione, Foto e colori, ERP e storico. Ogni scheda mostra quanti dati mancano. Azioni nel piede: Chiudi a sinistra; AI, Invia in revisione / Approva a destra. |
+| 5 | **Responsive** | Sotto 1024 px la modale occupa lo schermo e il riepilogo va in alto; sotto 600 px riepilogo compatto, schede scorrevoli, campi due per riga, chiusura con la × in alto. |
+| 6 | **Nome** | «Serra» sostituito da «Oltre Il Giardino» (resta solo la chiave interna di salvataggio del browser). |
+| 7 | **Listino pubblicabile** | `Catalogo/pubblica.py` crea `articoli-demo.js` senza fornitori, prezzi e note interne; usato su GitHub Pages quando manca `articoli.js`. |
+
+---
+
+## 0bis. Aggiornamenti 25/10/2026
 
 Lavoro dei giorni 24–25/10 (UI, anagrafiche, aiuti). Modifiche al prototipo:
 
@@ -232,7 +265,7 @@ Ogni micro-task appartiene a una tratta; squadra e mezzi si assegnano per tratta
 
 ### 3.4 Anagrafiche
 - **Addetto**: nome, ruolo (Autista, Capo squadra, Montatore, Magazziniere), patenti (B, C, CE; nessuna = non guida), abilitazioni (muletto, carrello), turno, assenze `{tipo, da, a}`.
-- **Mezzo**: nome, tipo, volume utile (m³), portata (kg), patente richiesta, classe Euro, massa (t), lunghezza (m), stato (Libero / Manutenzione). Corriere esterno a parte: preavviso 48 h, costo indicativo.
+- **Mezzo**: nome, tipo, volume utile (m³), portata (kg), patente richiesta, classe Euro, massa (t), lunghezza (m), `fermi` (stesso formato delle assenze, con tipo di fermo), `scadenze` {revisione, assicurazione, bollo, tagliando}. Lo `stato` è calcolato dai fermi (§0 n.5). Corriere esterno a parte: preavviso 48 h, costo indicativo.
 - **Zona ZTL**: nome, città, Euro minima, massa e lunghezza massime, fascia attiva, permesso richiesto, fonte. *I valori nel prototipo sono indicativi e vanno verificati.*
 - **Articolo**: codice, descrizione, categoria, volume, peso, ore·persona di carico e di allestimento per pezzo. *Sospeso: vedi §7.*
 
@@ -273,6 +306,7 @@ Per ogni tratta, nell'intervallo occupato dalla tratta:
 - Ogni modifica (orario, durata, aggiunta, spostamento, squadra, mezzi, nota, nome) marca il task come `manual`.
 - Cambiando inizio o durata, i task successivi della **stessa tratta** scorrono dello stesso intervallo.
 - ↑ ↓ scambia due task contigui mantenendo le durate: il primo parte all'inizio del precedente, il secondo subito dopo.
+- Ogni modifica entra nel **registro modifiche** e si può annullare (Ctrl+Z, o la voce nel registro con annullamento a catena delle successive sugli stessi ordini, §0 n.7).
 - **Ripristino** = rigenera le tratte dalla proposta (sequenza §4.1 + scelta di fine andata) e riassegna le risorse. Andata e Ritiro si ripristinano **insieme** perché sono legati (se la squadra resta o pernotta, il ritiro non ha il viaggio di andata). Cambiare "Dopo il lavoro" equivale a ripristinare Andata e Ritiro.
 
 ---
@@ -398,6 +432,7 @@ PDF Offerte/*.pdf
 
 | Semplificazione | Da fare in produzione |
 |---|---|
+| Registro modifiche senza «rifai» e senza autore | registro persistente per utente, Ctrl+Y |
 | Stato solo in memoria, nessun salvataggio | database, multi-utente (domanda aperta nel PRD) |
 | Volume e tempi per pezzo stimati dalla descrizione | anagrafica articoli (§7) |
 | Distanze per città da Grassobbio | API di routing |
@@ -431,7 +466,12 @@ PDF Offerte/*.pdf
 |---|---|
 | `Prototipo/index.html` | il prototipo completo |
 | `Prototipo/assets/logo-oig.png`, `logo-oig-biz.png` | logo nuovo senza "Noleggi Creativi" (estratto da `Documenti Vari/logo OIG_CMYK_NOLEGGI_CREATIVI.pdf`) |
-| `Prototipo/assets/offerte/` | estrazioni convertite e PDF delle 7 offerte (**contengono dati di clienti**) |
+| `Prototipo/assets/offerte/` | estrazioni convertite e PDF delle 7 offerte (**contengono dati di clienti**, esclusi da git) |
+| `Prototipo/assets/offerte-demo/` | le stesse offerte anonimizzate, pubblicate (generate da `Estrazione/anonimizza.py`) |
+| `Prototipo-Catalogo/index.html` | prototipo del catalogo, generato da `Catalogo/build.py` |
+| `Prototipo-Catalogo/assets/articoli.js`, `articoli-demo.js` | listino completo (escluso da git) e copia pubblicabile (`Catalogo/pubblica.py`) |
+| `Guida_Prototipo.md` | guida d'uso del prototipo e casi dimostrativi |
+| `Preventivo_Pianificatore_Catalogo.md` | preventivo delle due applicazioni, mercato e Patent Box |
 | `Estrazione/schema_offerta.json`, `prompt_e_config.md` | schema e prompt di estrazione |
 | `Estrazione/estrai.py`, `converti.py` | pipeline di estrazione e conversione |
 | `Estrazione/output/` | risposte grezze di LlamaExtract (**dati di clienti**) |
@@ -439,7 +479,7 @@ PDF Offerte/*.pdf
 | `PDF Offerte/` | le 7 offerte reali |
 | `Documenti Vari/` | Excel e PDF dei fogli giornalieri, logo |
 
-**Prima di versionare:** decidere se escludere da git `Estrazione/output/`, `Prototipo/assets/offerte/` e `PDF Offerte/` (dati personali di clienti e referenti).
+**Versionamento** (repository pubblico `uvolpato/OltreIlGiardino`, demo su GitHub Pages): `.gitignore` esclude `.env`, `PDF Offerte/`, `Documenti Vari/`, `Estrazione/output/`, `Prototipo/assets/offerte/`, il listino completo e i backup. Restano i nomi di clienti reali nei dati dimostrativi dentro `Prototipo/index.html`.
 
 ---
 
@@ -453,3 +493,8 @@ PDF Offerte/*.pdf
 | 4 | Confrontare le proposte con lo storico | ~20 offerte di ottobre già nel foglio Excel. |
 | 5 | Mostrare le percentuali "stimate" diversamente da quelle di LlamaExtract | km, ora mancante, servizio dedotto. |
 | 6 | Rigenerare la chiave LlamaCloud | È passata in chat. |
+| 7 | Avvisi dalle scadenze dei mezzi | Es. mezzo con revisione scaduta assegnato a una tratta. |
+| 8 | Catalogo prodotti, poi magazzino con impegno degli articoli | Disponibilità per data; prima il catalogo. |
+| 9 | Officina | Manutenzione e sistemazione degli articoli noleggiati rientrati danneggiati (dai report dei rientri). |
+| 10 | «Rifai» nel registro modifiche | Ctrl+Y, autore della modifica. |
+| 11 | Nomi di fantasia nei dati dimostrativi | Oggi i clienti dei dati di esempio sono reali. |

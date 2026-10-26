@@ -2,11 +2,20 @@
 
 > Documento di consolidamento dell'analisi e delle decisioni architetturali.
 > Controparte di prodotto: `PRD_Pianificatore_Logistica.md`.
-> Stato: work-in-progress (0.1). Aggiornato al 2026-10-19.
+> Stato: work-in-progress (0.1). Aggiornato al 2026-10-26.
 
 ---
 
-## 0. Aggiornamento 25/10/2026 (prototipo)
+## 0. Aggiornamento 26/10/2026 (prototipo)
+
+- **Mezzi**: nuovi campi `fermi` (periodi con tipo: manutenzione, revisione, tagliando, guasto, noleggiato a terzi) e `scadenze`. Lo stato non è più un campo: si calcola (`fermo(m, s, e)` per un intervallo, `statoMezzi()` per oggi). Nel modello dati di produzione: tabella `fermi_mezzo` (mezzo, tipo, inizio, fine) e `scadenze_mezzo`, nessuna colonna `stato`.
+- **Assenze e fermi** hanno lo stesso formato (giorni interi o ore) e lo stesso editor; per gli addetti vale la stessa regola: la disponibilità si calcola dai periodi.
+- **Registro modifiche**: ogni modifica al piano salva la copia degli ordini toccati prima della modifica; annullare ripristina quelle copie e annulla a catena le modifiche successive sugli stessi ordini. In produzione: tabella eventi con utente, ordine, prima/dopo (delta per campo) e annullamento come evento.
+- **Magazzino**: report di preparazione (carichi del giorno dopo) e di rientro per ordine, con persone schedulate sul task; quantità dall'offerta, senza impegno degli articoli (che arriva dopo il catalogo).
+- **Suite**: il catalogo prodotti è un'app separata (database proprio) con gli stessi componenti; `Catalogo/build.py` li copia dal prototipo Logistica.
+- **Dati pubblicabili**: offerte anonimizzate (`Estrazione/anonimizza.py`) e listino senza fornitori e prezzi (`Catalogo/pubblica.py`) per la demo su GitHub Pages.
+
+## 0bis. Aggiornamento 25/10/2026 (prototipo)
 
 Modifiche al prototipo `Prototipo/index.html` rilevanti per il data model e l'architettura:
 

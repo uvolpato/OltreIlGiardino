@@ -17,7 +17,7 @@ La navigazione è sulla colonna di sinistra. Ogni voce apre una vista; il titolo
 | **Pianificazione (Gantt)** | Ordini e micro-task su una timeline; barra dei mesi con etichette sticky (sempre visibili) | Vede il piano nel tempo, i conflitti, e sposta i task trascinando le barre |
 | **Ordini** | Elenco delle offerte importate | Cerca, filtra e apre il dettaglio di un ordine |
 | **Risorse** | Addetti, mezzi, squadre, trasportatori, articoli, zone ZTL, micro-task/formule, tabelle di lookup | Anagrafiche: qui si creano e modificano le entità che alimentano il piano |
-| **Magazzino** | Carichi e preparazioni del giorno successivo | Prepara la merce con anticipo; esporta CSV |
+| **Magazzino** | Report da stampare, una scheda per ordine: «Da preparare per domani» e «Rientri attesi» | Preparare e caricare la merce, controllare cosa rientra; stampa ed esporta CSV |
 | **Notifiche & ore** | Alert pendenti e riconciliazione ore | Tiene sotto controllo conferme (motrice, ZTL) e scostamenti ore |
 | **Componenti** | Catalogo dal vivo della libreria UI | Strumento per chi sviluppa/configura l'interfaccia |
 
@@ -34,6 +34,7 @@ La navigazione è sulla colonna di sinistra. Ogni voce apre una vista; il titolo
 3. **Correggi dal dettaglio** — cliccando una barra o un ordine si apre il pannello di dettaglio (vedi §3).
 4. **Mantieni le anagrafiche** in *Risorse* (addetti con ruoli/patenti/certificazioni, mezzi, articoli, zone, lookup — vedi §4).
 5. **Stampa/esporta** dal *Foglio del giorno* o dal *Magazzino* per la condivisione.
+6. **Torna indietro** con Ctrl+Z o dal *Registro modifiche* (icona con l'orologio in alto) — vedi §3bis.
 
 ---
 
@@ -55,18 +56,33 @@ Si apre cliccando un ordine, un micro-task o un avviso. È un pannello **centrat
 
 ---
 
+## 3bis. Salvare e annullare
+
+- Nel piano **non c'è un Salva**: ogni modifica si applica appena cambi un campo; Gantt e avvisi si ricalcolano e un messaggio dice se ci sono nuovi conflitti o se ne sono stati risolti. «Chiudi» non annulla nulla.
+- **Puntino bianco** su una barra = task modificato a mano; **pallino arancione** nella sequenza = task in conflitto.
+- **Ctrl+Z** annulla l'ultima modifica al piano (non mentre si scrive in un campo).
+- **Registro modifiche**: generale (icona con l'orologio nella barra in alto) o del singolo ordine (pulsante nel piede del dettaglio ordine). Ogni voce: ora, descrizione, ordini toccati, «Annulla».
+- Annullare una voce annulla anche **le successive sugli stessi ordini** (si basavano su di lei): prima compare una conferma con l'elenco. Le modifiche su altri ordini restano. Le voci annullate restano barrate.
+- Anagrafiche, ferie e fermi si salvano con il **Salva** del loro dialog e non entrano nel registro.
+
 ## 4. Anagrafiche e tabelle di lookup (vista Risorse)
 
 Tutte le entità che alimentano il piano sono create/modificate qui (pulsanti **«+ Nuovo»** e **«Modifica/Elimina»** su ogni riga).
 
 - **Addetti** — hanno **più ruoli** (es. Autista + Montatore), **patenti** e **certificazioni selezionabili** a checkbox. I ruoli **guidano l'assegnazione** (mappatura in `RUOLO_TASK`): il sistema preferisce chi ha un ruolo adatto ai micro-task della tratta; la patente resta il requisito tecnico per la guida.
 - **Assenze / ferie / permessi** — per ogni addetto, con durata **giornata intera** (dal → al; stesso giorno = solo quello) o **parziale** (giorno + dalle → alle). Si inseriscono dal CRUD addetto (che mostra anche un **mini-gantt** con le ferie di tutti, addetto in modifica evidenziato) o dal pulsante **«Ferie / permessi»** nella Pianificazione "Per risorsa"; i blocchi nel Gantt sono cliccabili per rimuoverli.
-- **Mezzi** — patente richiesta, capacità, classe Euro, stato (da tabella `STATI_MEZZI`).
+- **Dialog addetto e mezzo a schede**, sempre della stessa dimensione:
+  - *Addetto*: Anagrafica, Competenze, Disponibilità, Archivio.
+  - *Mezzo*: Dati, Scadenze, Disponibilità, Archivio.
+  - *Disponibilità*: timeline del mese (‹ › Oggi), prima riga l'addetto o il mezzo, sotto i colleghi assenti nel mese (per i mezzi: quelli dello stesso tipo fermi). Trascinando sui giorni si crea un periodo; cliccando un periodo si apre la sua riga. Sotto, i periodi in programma (circa 3 righe, poi scorrono).
+  - *Archivio*: i periodi conclusi.
+  - Non si salva con date incoerenti, periodi sovrapposti o date mancanti: il dialog apre la riga da correggere.
+- **Mezzi** — patente richiesta, capacità, classe Euro, **scadenze** (revisione, assicurazione, bollo, tagliando) e **fermi**; lo stato Libero/Fermo si calcola dai fermi, giorno per giorno.
 - **Squadre / Trasportatori** — squadre generate dagli ordini; trasportatori esterni con tariffa.
 - **Articoli** — **anagrafica separata** con il `codice` come chiave (futura **FK**). Le righe d'ordine che citano un codice inesistente compaiono come «Da censire» e **non** vengono inserite nell'anagrafica: il DB resta consistente in vista della FK.
 - **Zone ZTL** — vincoli di accesso (Euro, massa, lunghezza, permessi).
 - **Micro-task e formule** — catalogo dei tipi e delle regole di durata stimate.
-- **Tabelle** — le tabelle di **lookup** (Ruoli, Patenti, Certificazioni, Stati mezzi) sono elenchi modificabili che alimentano i menu di selezione. Le modifiche valgono per la sessione corrente.
+- **Tabelle** — le tabelle di **lookup** (Ruoli, Patenti, Certificazioni, Tipi di fermo mezzo) sono elenchi modificabili che alimentano i menu di selezione. Le modifiche valgono per la sessione corrente.
 
 ---
 
@@ -91,4 +107,7 @@ Le chiavi usate oggi: `vista-*` (aiuto della vista corrente), più le sezioni de
 - La **timeline del Gantt** è un componente riusabile `timeline(R, {corner, body, zoom})`; la barra dei mesi usa segmenti `.mbseg` con etichetta sticky `.mb-lab` per mese.
 - Le etichette di ambito del dettaglio (`Ordine` / `Tratta` / `Questo task` / `Piano` / `Avvisi`) sono rese da `detPanel()`.
 - I dialoghi di inserimento/modifica dati usano la classe `dialog.form` (larghezza moderata, griglia a 2 colonne); la multi-selezione a checkbox usa `crudMulti()` e lo stile `.chk`/`.chipgroup`.
-- Le assenze/ferie usano l'editor `crudAssenze()`/`assRow()` (giornata intera o parziale) e il dialog `apriDialogAssenza()`.
+- Ferie e fermi usano un editor comune configurato da `DISP` (addetti: `assenze`, mezzi: `fermi`): `formAddetto()`/`formMezzo()`, `renderAssenze()`, `renderAeTimeline()`, `assRow()`, convalida `aeValida()`.
+- I dialog a schede usano `.panes`: tutte le schede nella stessa cella della griglia, le inattive con l'attributo `data-off` (non `hidden`, che è `display:none` globale), così il dialog non cambia dimensione.
+- Il registro modifiche è in fondo allo script: `registra()` (chiamata da `dopoModifica` e `render`), `catena()`, `annullaVoce()`, `apriRegistro()`.
+- **Catalogo prodotti**: è un'app della stessa suite. `Catalogo/build.py` copia da questo file stile e libreria dei componenti: un componente cambiato qui cambia anche nel catalogo alla build successiva.

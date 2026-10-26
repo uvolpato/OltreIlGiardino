@@ -2,7 +2,7 @@
 
 Prototipo separato dalla Logistica per l'anagrafica articoli. Specifiche: `../PRD_Catalogo_Prodotti.md`.
 
-**Aprire:** `Prototipo-Catalogo/index.html` (doppio clic, nessuna installazione). Le modifiche restano nel browser (localStorage); "Azzera" in basso a sinistra riparte dai dati originali.
+**Aprire:** `Prototipo-Catalogo/index.html` (doppio clic, nessuna installazione). Le modifiche restano nel browser (localStorage); "Azzera" in basso a sinistra riparte dai dati originali. Senza il listino completo (escluso da git) usa `assets/articoli-demo.js`, senza fornitori e prezzi.
 
 ## Rigenerare
 ```
@@ -16,7 +16,7 @@ Si modifica `Catalogo/app.js` e `Catalogo/catalogo.css`, poi si rilancia `build.
 |---|---|---|
 | Accesso | tutti | un solo accesso (SSO simulato), scelta del ruolo |
 | Catalogo | tutti | 2.194 articoli raggruppati in 1.643 modelli con varianti; ricerca, filtri per stato, classe e famiglia di colore; griglia o tabella; completezza della scheda |
-| Scheda articolo | tutti (commerciale in sola lettura) | varianti di colore, descrizioni, classificazione a 3 livelli, codice colore e materiale (dal codice), colori RGB dalla foto, funzione/stili/temi/caratteristiche, misure per la logistica (volume, peso, pila, tempi), composizione (parte, anima, rivestimento, struttura; "usato come componente in"), foto, dati commerciali in sola lettura, storico |
+| Scheda articolo | tutti (commerciale in sola lettura) | riepilogo fisso a sinistra (foto, stato, codice, classe, colore, varianti, cosa manca) e 6 schede: Descrizione, Uso negli eventi, Misure (anche volume, peso, pila, tempi), Composizione (parte, anima, rivestimento, struttura; "usato come componente in"), Foto e colori (RGB dalla foto), ERP e storico. Responsive |
 | Censimento | censitore, curatore, logistica | il telefono: nuovo / completa / solo foto → foto (fotocamera o esempio) → nota e prompt → AI → proposta con articoli simili → invio in revisione |
 | Revisione | curatore | coda delle schede da approvare |
 | Prompt immagini | curatore | prompt standard e personali per Nano Banana |

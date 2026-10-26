@@ -15,6 +15,8 @@
 | 0.2 | 2026-10-25 | Ugo | Aggiornamento dal prototipo: addetti multi-ruolo, patenti/certificazioni selezionabili, ruoli che guidano l'assegnazione, anagrafica articoli separata (FK-ready), lookup modificabili, maschere di dettaglio centrate con etichette di ambito, tooltip contestuali. Dettaglio in `Specifiche_Prototipo_2026-10-20.md` §0 e `Documentazione_UI.md` |
 | 0.3 | 2026-10-25 | Ugo | Assenze/ferie/permessi con giornata intera vs parziale (ore); gestione in "Per risorsa" e nel CRUD addetto; azioni "Nuovo" in topbar; timeline estratta come componente riusabile; barra dei mesi con etichetta sticky per mese; mini-gantt assenze nel CRUD. |
 
+| 0.4 | 2026-10-26 | Ugo | Dialog addetto e mezzo a schede con disponibilità e archivio; fermi e scadenze dei mezzi, stato calcolato; report di magazzino per ordine (preparazione del giorno dopo, rientri); registro modifiche con annullamento a catena; dati dimostrativi su 20 giorni. Dettagli in `Specifiche_Prototipo_2026-10-20.md` §0 |
+
 ---
 
 ## 1. Executive Summary
