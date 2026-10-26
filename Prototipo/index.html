@@ -241,6 +241,13 @@ body.panning .gscroll, body.panning .gscroll *{cursor:grabbing !important; user-
   .view.fit .planner{flex:1; min-height:0; align-items:stretch}
   .view.fit .planner > .card{display:flex; flex-direction:column; min-height:0}
   .view.fit .gscroll,.view.fit .alerts-scroll{flex:1; min-height:0; max-height:none}
+  /* vista con una sola card che contiene un datatable (sopra possono esserci kpi o note): la card riempie lo spazio,
+     scorrono solo le righe con l'intestazione sticky. Viste con più card scorrono come pagina. */
+  .view:has(> .card > .table-box):not(:has(> .card ~ .card)){overflow:hidden; padding-bottom:20px}
+  .view:has(> .card > .table-box):not(:has(> .card ~ .card)) > *{flex:none}
+  .view:has(> .card > .table-box):not(:has(> .card ~ .card)) > .card{flex:1; min-height:0; display:flex; flex-direction:column}
+  .view:has(> .card > .table-box):not(:has(> .card ~ .card)) > .card > *{flex:none}
+  .view:has(> .card > .table-box):not(:has(> .card ~ .card)) > .card > .table-box{flex:1 1 0; min-height:120px; overflow:auto}
 }
 .legend{flex:none; display:flex; gap:6px 16px; flex-wrap:wrap; padding:12px 16px; border-top:1px solid var(--border); font-size:12px; color:var(--muted)}
 
