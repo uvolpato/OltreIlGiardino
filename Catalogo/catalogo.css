@@ -2,7 +2,31 @@
 .link{border:0; background:none; padding:0; color:var(--accent-ink); cursor:pointer; font:inherit; text-decoration:underline; text-underline-offset:2px}
 .side-foot strong{color:var(--fg)}
 .sec{display:block}
-.drawer{width:min(760px,100vw)}
+.drawer{width:min(1520px,calc(100vw - 48px))}
+/* sotto i 1024px la modale occupa tutto lo schermo, come nella Logistica */
+@media (max-width:1024px){ .drawer{width:100vw} }
+/* scheda articolo: riepilogo fisso a sinistra, schede a destra */
+.art{display:grid; grid-template-columns:300px minmax(0,1fr); min-height:100%}
+.art-side{display:flex; flex-direction:column; gap:14px; padding:20px; border-right:1px solid var(--border); background:var(--sunken)}
+.art-side .kv{grid-template-columns:70px 1fr; font-size:12.5px}
+.art-manca{list-style:none; margin:6px 0 0; padding:0; display:grid; gap:2px}
+.art-manca .btn{width:100%; justify-content:flex-start; color:var(--warn)}
+.art-main{display:flex; flex-direction:column; min-width:0}
+.art-main .tabbar{position:sticky; top:0; z-index:2; background:var(--surface); padding:0 20px; overflow-x:auto; scrollbar-width:none}
+.art-main .tabbar button{white-space:nowrap; flex:none}
+.art-pane{padding:20px 24px; display:flex; flex-direction:column; gap:16px; max-width:1100px}
+.art-grp{display:grid; gap:8px}
+.art-uso{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 24px}
+.ph.side{border-radius:var(--r-lg); overflow:hidden}
+/* tablet: riepilogo in alto, compatto (foto accanto ai dati) */
+@media (max-width:900px){ .art{grid-template-columns:1fr} .art-side{border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:160px minmax(0,1fr); align-items:start}
+  .art-side > *:not(.ph){grid-column:2} .art-side .ph{grid-row:1 / span 4} .art-uso{grid-template-columns:1fr} }
+/* telefono: tutto in colonna, campi uno per riga */
+@media (max-width:600px){ .art-side{grid-template-columns:96px minmax(0,1fr); padding:14px; gap:10px} .art-pane{padding:16px}
+  .art-pane .fgrid,.art-pane .fgrid.g4{grid-template-columns:1fr 1fr} .art-pane .fgrid .full{grid-column:1/-1} .addc input#nc-desc{min-width:0; width:100%}
+  .art-side .kv dt:nth-of-type(4),.art-side .kv dd:nth-of-type(4){display:none}
+  #drawerFoot [data-act="close-drawer"]{display:none}   /* sul telefono si chiude con la × in alto */
+  .art-manca{display:flex; flex-wrap:wrap; gap:4px} .art-manca .btn{width:auto} }
 .view{overflow:auto}
 /* accesso */
 body.no-auth{background:linear-gradient(160deg,var(--bg),oklch(93% 0.03 150))}

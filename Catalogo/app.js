@@ -166,55 +166,69 @@ function griglia(list){
 function openDrawer(fn){ state.drawer=fn; fn(); $("drawer").classList.add("open"); $("scrim").classList.add("open"); }
 function closeDrawer(){ state.drawer=null; state.sel=null; $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); $("drawerFoot").hidden=true; }
 function fillDrawer(kicker,title,html,foot=""){ $("drawerKicker").textContent=kicker; $("drawerTitle").textContent=title; const sc=$("drawerBody").scrollTop; $("drawerBody").innerHTML=html; $("drawerBody").scrollTop=sc; $("drawerFoot").innerHTML=foot; $("drawerFoot").hidden=!foot; }
-const apri=c=>{ state.sel=c; openDrawer(drawerArticolo); };
+const apri=c=>{ if(!state.drawer) state.atab="scheda"; state.sel=c; openDrawer(drawerArticolo); $("drawerBody").scrollTop=0; };
+/* scheda articolo: a sinistra il riepilogo sempre visibile (foto, stato, varianti, cosa manca),
+   a destra una scheda per argomento. Ogni voce di completezza porta alla scheda dove si completa. */
+const SCHEDE_ART=[["scheda","Descrizione"],["uso","Uso negli eventi"],["misure","Misure"],["comp","Composizione"],["foto","Foto e colori"],["info","ERP e storico"]];
+const CHECK_TAB={foto:"foto",desc:"scheda",dim:"misure",log:"misure",rgb:"foto",temi:"uso",funz:"uso"};
 function drawerArticolo(){
   const a=art(state.sel); if(!a) return closeDrawer();
   const g=gruppi().find(x=>x.some(y=>y.c===a.c))||[a], [s,t]=statoArt(a), c=a.c, ro=state.ruolo==="commerciale";
-  const usatoIn=ARTICOLI().map(conOv).filter(x=>(x.comp||[]).some(k=>k.cod===c));
-  const pesoComp=(a.comp||[]).reduce((s,k)=>s+((art(k.cod)?.peso||0)*(k.q||1)),0);
-  const volAuto=a.L&&a.P&&a.H?a.L*a.P*a.H/1e6:a.D&&a.H?Math.PI*(a.D/2)**2*a.H/1e6:null;
+  const tab=state.atab||"scheda", manca=CHECK.filter(([,,fn])=>!fn(a)), mancaIn=k=>manca.filter(([m])=>CHECK_TAB[m]===k).length;
   const dis=ro?" disabled":"", at=k=>`data-f="${k}" data-c="${esc(c)}"${dis}`;
   const f=(k,et,step="any",suff="")=>UI.campo({id:"f-"+k,etichetta:et+(suff?` (${suff})`:""),valore:a[k]??"",tipo:"number",attr:`${at(k)} step="${step}"`});
   const sel=(k,et,op,v)=>`<div><label class="fl" for="f-${k}">${esc(et)}</label><select id="f-${k}" ${at(k)}>${op.map(o=>{const [val,l]=Array.isArray(o)?o:[o,cap(o)]; return `<option value="${esc(val)}"${val===v?" selected":""}>${esc(l)}</option>`;}).join("")}</select></div>`;
-  const testa=`<div class="detail-section"><div class="sch-top">${ph(a,"big")}<div class="grow">
-      <div class="row wrap">${UI.stato(s,t)}${a.dup?UI.stato("codice duplicato","err"):""}${a.nuovo?UI.stato("censito da telefono","info"):""}${a.ai?UI.stato("proposta AI da controllare","warn"):""}<span class="grow"></span>${UI.misura(Math.round(compl(a)*100),100,"% scheda")}</div>
-      <div class="sch-check">${CHECK.map(([k,l,fn])=>`<span class="${fn(a)?"ok":""}">${fn(a)?"✓":"○"} ${l}</span>`).join("")}</div>
-      ${g.length>1?`<div class="eyebrow" style="margin-top:12px">Varianti · ${g.length}</div><div class="var">${g.map(x=>`<button class="vb${x.c===c?" on":""}" data-act="apri" data-c="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")}<span><span class="mono tiny">-${esc(x.cc||"")}</span> ${esc(nomeColore(x.cc)||x.d)}</span></button>`).join("")}</div>`:""}
-    </div></div></div>`;
-  const descr=blocco("Descrizioni",`<div class="fgrid">${UI.campo({id:"f-d",etichetta:"Descrizione breve (max 40)",valore:a.d,attr:`maxlength="60" ${at("d")}`})}${UI.campo({id:"f-t",etichetta:"Titolo",valore:a.t,attr:at("t")})}
-      ${UI.campo({id:"f-e",etichetta:"Descrizione estesa",valore:a.e,tipo:"textarea",pieno:true,attr:at("e")})}</div>${(a.d||"").length>40?UI.nota("La descrizione breve supera i 40 caratteri del tracciato ERP."):""}`);
-  const classi=blocco("Classificazione, colore e materiale",`<div class="fgrid">${sel("k1","Classe",CLASSI1,a.k1)}${sel("k2","Sottoclasse",classi2(a.k1),a.k2)}${sel("k3","Tipo",classi3(a.k1,a.k2),a.k3)}
-      ${sel("cc","Codice colore aziendale",Object.entries(CAT.colori).map(([k,n])=>[k,`${k} ${n}`]),a.cc)}</div>
-      ${UI.dettagli([["Materiale (dal codice)",a.mat?`<span class="mono">${a.mat}</span> ${esc(nomeMateriale(a.mat))}`:"—"],
-        ["Colori dalla foto",a.rgb?.length?`<span class="row wrap">${a.rgb.map(x=>`${sw(x.hex,"",true)}<span class="mono tiny">${x.hex} · ${x.pct}%</span>`).join("")}</span><div class="tiny muted">codice più vicino: ${vicino(hex2rgb(a.rgb[0].hex))} ${esc(nomeColore(vicino(hex2rgb(a.rgb[0].hex))))}</div>`:'<span class="muted">non ancora rilevati (servono foto)</span>'],
-        ["Codice",`<span class="mono">${esc(c)}</span> <span class="tiny muted">classe ${esc(CODICI1[a.k1]||"?")} · sottoclasse ${esc(CODICI2[a.k1+"|"+a.k2]||"?")} · materiale ${esc(a.mat||"?")} · colore ${esc(a.cc||"?")}</span>`]])}`);
-  const uso=blocco("Uso negli eventi",`${UI.nota("Funzione, stili e temi aiutano i commerciali a cercare per allestimento; le voci arrivano da elenchi fissi.")}
-      <label class="fl">Funzione</label>${scelte("funz",FUNZIONI,a.funz||[],c,ro)}<label class="fl">Stile</label>${scelte("stili",STILI,a.stili||[],c,ro)}
-      <label class="fl">Temi</label>${scelte("temi",TEMI,a.temi||[],c,ro)}<label class="fl">Caratteristiche</label>${scelte("attr",ATTR,a.attr||[],c,ro)}`);
-  const comp=blocco(`Composizione · ${(a.comp||[]).length} componenti`,`${UI.tabella({colonne:[{t:"Ruolo"},{t:"Componente"},{t:"Q.tà",num:true},{t:""}],vuoto:"Nessun componente.",righe:(a.comp||[]).map((k,i)=>{const ka=k.cod&&art(k.cod);
+
+  /* ---- riepilogo (colonna sinistra) ---- */
+  const riep=`<aside class="art-side">${ph(a,"side")}
+    <div class="row wrap" style="gap:4px">${UI.stato(s,t)}${a.dup?UI.stato("codice duplicato","err"):""}${a.nuovo?UI.stato("censito da telefono","info"):""}${a.ai?UI.stato("proposta AI da controllare","warn"):""}</div>
+    ${UI.dettagli([["Codice",`<span class="mono">${esc(c)}</span>`],["Classe",`${esc(cap(a.k1))} › ${esc(cap(a.k2))}${a.k3?` › ${esc(cap(a.k3))}`:""}`],["Colore",a.cc?`${sw(RGB[a.cc]||"#ddd")} ${esc(a.cc)} ${esc(nomeColore(a.cc))}`:"—"],["Misure",esc(a.dim||"—")]])}
+    ${g.length>1?`<div><div class="eyebrow">Varianti · ${g.length}</div><div class="var">${g.map(x=>`<button class="vb${x.c===c?" on":""}" data-act="apri" data-c="${esc(x.c)}" title="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")}<span>${esc(nomeColore(x.cc)||x.cc||x.d)}</span></button>`).join("")}</div></div>`:""}
+    <div><div class="row"><span class="eyebrow grow">Scheda completa</span>${UI.misura(Math.round(compl(a)*100),100,"%")}</div>
+      ${manca.length?`<ul class="art-manca">${manca.map(([k,l])=>`<li><button class="btn btn-sm btn-ghost" data-act="tab" data-k="atab" data-v="${CHECK_TAB[k]}">○ ${esc(l)} ›</button></li>`).join("")}</ul>`:'<p class="small" style="color:var(--ok)">✓ Tutti i dati richiesti ci sono</p>'}</div>
+  </aside>`;
+
+  /* ---- contenuto delle schede ---- */
+  const usatoIn=ARTICOLI().map(conOv).filter(x=>(x.comp||[]).some(k=>k.cod===c));
+  const pesoComp=(a.comp||[]).reduce((s,k)=>s+((art(k.cod)?.peso||0)*(k.q||1)),0);
+  const volAuto=a.L&&a.P&&a.H?a.L*a.P*a.H/1e6:a.D&&a.H?Math.PI*(a.D/2)**2*a.H/1e6:null;
+  const corpo={
+    scheda:()=>`<div class="fgrid">${UI.campo({id:"f-t",etichetta:"Nome",valore:a.t,attr:at("t"),pieno:true})}
+        ${UI.campo({id:"f-e",etichetta:"Descrizione",valore:a.e,tipo:"textarea",pieno:true,attr:`rows="5" ${at("e")}`})}
+        ${UI.campo({id:"f-d",etichetta:`Descrizione breve per l'ERP (${(a.d||"").length}/40)`,valore:a.d,attr:`maxlength="60" ${at("d")}`,pieno:true})}
+        ${sel("k1","Classe",CLASSI1,a.k1)}${sel("k2","Sottoclasse",classi2(a.k1),a.k2)}${sel("k3","Tipo",classi3(a.k1,a.k2),a.k3)}
+        ${sel("cc","Colore",Object.entries(CAT.colori).map(([k,n])=>[k,`${k} ${n}`]),a.cc)}</div>
+      ${(a.d||"").length>40?UI.nota("La descrizione breve supera i 40 caratteri ammessi dall'ERP."):""}
+      <p class="small muted">Materiale (dal codice): ${a.mat?`<span class="mono">${a.mat}</span> ${esc(nomeMateriale(a.mat))}`:"—"}</p>`,
+    uso:()=>`<div class="art-uso"><div><label class="fl">Funzione</label>${scelte("funz",FUNZIONI,a.funz||[],c,ro)}</div><div><label class="fl">Temi</label>${scelte("temi",TEMI,a.temi||[],c,ro)}</div>
+        <div><label class="fl">Stile</label>${scelte("stili",STILI,a.stili||[],c,ro)}</div><div><label class="fl">Caratteristiche</label>${scelte("attr",ATTR,a.attr||[],c,ro)}</div></div>`,
+    misure:()=>`<p class="small">Dal file: <span class="mono">${esc(a.dim||"—")}</span></p>
+      <div class="art-grp"><div class="eyebrow">Dimensioni da montato</div><div class="fgrid g4">${f("L","Lunghezza","any","cm")}${f("P","Profondità","any","cm")}${f("H","Altezza","any","cm")}${f("D","Diametro","any","cm")}</div></div>
+      <div class="art-grp"><div class="eyebrow">Trasporto ${UI.hint("sch-misure")}</div><div class="fgrid g4">${f("vol","Volume imballato","0.01","m³")}${f("peso","Peso","0.1","kg")}${f("pila","Pezzi per pila","1")}${f("pers","Persone per spostarlo","1")}</div>
+        ${volAuto&&!a.vol&&!ro?`<div class="row" style="margin-top:8px"><span class="small muted grow">Dalle dimensioni: ${num(volAuto,3)} m³ da montato.</span><button class="btn btn-sm" data-act="usa-vol" data-c="${esc(c)}" data-v="${volAuto.toFixed(3)}">Usa come volume</button></div>`:""}</div>
+      <div class="art-grp"><div class="eyebrow">Tempi</div><div class="fgrid g4">${f("tCar","Carico per pezzo","0.5","min")}${f("tMon","Montaggio per pezzo","1","min")}</div></div>`,
+    comp:()=>`${UI.tabella({colonne:[{t:"Ruolo"},{t:"Componente"},{t:"Q.tà",num:true},{t:""}],vuoto:"Nessun componente.",righe:(a.comp||[]).map((k,i)=>{const ka=k.cod&&art(k.cod);
         return [UI.stato(RUOLI[k.ruolo]||k.ruolo,k.ruolo==="rivestimento"?"info":""),ka?`<button class="btn btn-sm btn-ghost" data-act="apri" data-c="${esc(k.cod)}">${esc(ka.d)}</button> <span class="mono tiny muted">${esc(k.cod)}</span>`:esc(k.desc),k.q||1,
           ro?"":`<button class="icon-btn" data-act="rm-comp" data-c="${esc(c)}" data-i="${i}" aria-label="Togli ${esc(ka?.d||k.desc)}">${icon("x",13)}</button>`];})})}
       ${ro?"":`<div class="addc"><select id="nc-ruolo" aria-label="Ruolo">${Object.entries(RUOLI).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
         <input id="nc-desc" placeholder="Descrizione del componente, o cerca un articolo (es. copertura)…" list="nc-list" aria-label="Componente"><datalist id="nc-list">${suggerisciComp(a).map(x=>`<option value="${esc(x.c)} · ${esc(x.d)}">`).join("")}</datalist>
         <input id="nc-q" type="number" min="1" value="1" style="width:72px" aria-label="Quantità"><button class="btn btn-sm" data-act="add-comp" data-c="${esc(c)}">+ Aggiungi</button></div>`}
-      ${pesoComp?`<p class="tiny muted">Peso dai componenti: ${num(pesoComp)} kg</p>`:""}
-      ${usatoIn.length?`<p class="small">Usato come componente in: ${usatoIn.map(x=>`<button class="btn btn-sm btn-ghost" data-act="apri" data-c="${esc(x.c)}">${esc(x.d)}</button>`).join(" ")}</p>`:""}`,{aiuto:"sch-comp"});
-  const foto=blocco(`Foto · ${(a.foto||[]).length+(a.fotoNuove||[]).length}`,`<div class="fotos">${(a.fotoNuove||[]).map((x,i)=>`<figure class="${x.main?"main":""}"><img src="${x.pres||x.orig}" alt=""><figcaption class="tiny">${esc(x.prompt||"originale")}${x.main?" · principale":""}</figcaption>${ro||x.main?"":`<button class="btn btn-sm btn-ghost" data-act="foto-main" data-c="${esc(c)}" data-i="${i}">Rendi principale</button>`}</figure>`).join("")}
-      ${(a.foto||[]).map((n,i)=>`<figure><div class="ph sm" style="--ph:${RGB[a.cc]||"#ddd"}"></div><figcaption class="tiny mono">${esc(n)}${i===0?" · principale":""}</figcaption></figure>`).join("")}</div>
-      ${UI.nota("Le foto sono indicate per nome: la cartella immagini non è ancora nel progetto.")}`);
-  const misure=blocco("Misure per la logistica",`<p class="small">Dal file: <span class="mono">${esc(a.dim||"—")}</span></p>
-      <div class="fgrid">${f("L","Lunghezza","any","cm")}${f("P","Profondità","any","cm")}${f("H","Altezza","any","cm")}${f("D","Diametro","any","cm")}
-      ${f("vol","Volume imballato","0.01","m³")}${f("peso","Peso","0.1","kg")}${f("pila","Pezzi per pila","1")}${f("pers","Persone per spostarlo","1")}
-      ${f("tCar","Carico per pezzo","0.5","min")}${f("tMon","Montaggio per pezzo","1","min")}</div>
-      ${volAuto&&!a.vol&&!ro?`<div class="row"><span class="small muted grow">Dalle dimensioni: ${num(volAuto,3)} m³ da montato (se l'imballo è diverso, misuralo).</span><button class="btn btn-sm" data-act="usa-vol" data-c="${esc(c)}" data-v="${volAuto.toFixed(3)}">Usa come volume</button></div>`:""}`,{aiuto:"sch-misure"});
-  const comm=blocco("Dati commerciali (dall'ERP)",UI.dettagli([["Fornitore",esc(a.f||"—")+(a.f2?` · ${esc(a.f2)}`:"")],["Prezzo noleggio",a.pn!=null?`€ ${num(a.pn,2)}`:"—"],["Prezzo vendita",a.pv!=null?`€ ${num(a.pv,2)}`:"—"],["Unità",esc(a.um)],a.n&&["Note interne",esc(a.n)]])
-      +UI.nota(a.pn==null&&a.f==null?"Nella versione pubblica fornitori e prezzi sono esclusi.":"Prezzi e fornitori restano nell'ERP: qui sono in sola lettura."));
-  const storico=blocco(`Storico modifiche · ${(a.storico||[]).length}`,(a.storico||[]).slice().reverse().map(h=>`<div class="small"><span class="mono tiny muted">${h.q}</span> ${esc(h.chi)} — ${esc(h.n)}</div>`).join("")||'<p class="small muted">Nessuna modifica: dati originali.</p>');
+      ${pesoComp?`<p class="small muted">Peso dai componenti: ${num(pesoComp)} kg</p>`:""}
+      ${usatoIn.length?`<p class="small">Usato come componente in: ${usatoIn.map(x=>`<button class="btn btn-sm btn-ghost" data-act="apri" data-c="${esc(x.c)}">${esc(x.d)}</button>`).join(" ")}</p>`:""}`,
+    foto:()=>`<div class="fotos">${(a.fotoNuove||[]).map((x,i)=>`<figure class="${x.main?"main":""}"><img src="${x.pres||x.orig}" alt=""><figcaption class="tiny">${esc(x.prompt||"originale")}${x.main?" · principale":""}</figcaption>${ro||x.main?"":`<button class="btn btn-sm btn-ghost" data-act="foto-main" data-c="${esc(c)}" data-i="${i}">Rendi principale</button>`}</figure>`).join("")}
+        ${(a.foto||[]).map((n,i)=>`<figure><div class="ph sm" style="--ph:${RGB[a.cc]||"#ddd"}"></div><figcaption class="tiny mono">${esc(n)}${i===0?" · principale":""}</figcaption></figure>`).join("")||(a.fotoNuove?.length?"":'<p class="small muted">Nessuna foto.</p>')}</div>
+      ${ro?"":`<div><button class="btn btn-sm" data-act="foto-da" data-c="${esc(c)}">${icon("cam",15)} Aggiungi foto da telefono</button></div>`}
+      <div class="art-grp"><div class="eyebrow">Colori rilevati dalla foto</div>${a.rgb?.length?`<div class="row wrap">${a.rgb.map(x=>`${sw(x.hex,"",true)}<span class="mono tiny">${x.hex} · ${x.pct}%</span>`).join("")}</div><p class="tiny muted">Codice colore più vicino: ${vicino(hex2rgb(a.rgb[0].hex))} ${esc(nomeColore(vicino(hex2rgb(a.rgb[0].hex))))}</p>`:'<p class="small muted">Si calcolano quando si aggiunge una foto.</p>'}</div>
+      ${UI.nota("Le foto del file sono indicate per nome: la cartella immagini non è ancora nel progetto.")}`,
+    info:()=>`<div class="art-grp"><div class="eyebrow">Dati commerciali (dall'ERP, sola lettura)</div>${UI.dettagli([["Fornitore",esc(a.f||"—")+(a.f2?` · ${esc(a.f2)}`:"")],["Prezzo noleggio",a.pn!=null?`€ ${num(a.pn,2)}`:"—"],["Prezzo vendita",a.pv!=null?`€ ${num(a.pv,2)}`:"—"],["Unità",esc(a.um)],a.n&&["Note interne",esc(a.n)]])}
+        ${a.pn==null&&a.f==null?UI.nota("Nella versione pubblica fornitori e prezzi sono esclusi."):""}</div>
+      <div class="art-grp"><div class="eyebrow">Codice</div><p class="small"><span class="mono">${esc(c)}</span> — classe ${esc(CODICI1[a.k1]||"?")} · sottoclasse ${esc(CODICI2[a.k1+"|"+a.k2]||"?")} · materiale ${esc(a.mat||"?")} · colore ${esc(a.cc||"?")}</p></div>
+      <div class="art-grp"><div class="eyebrow">Storico modifiche · ${(a.storico||[]).length}</div>${(a.storico||[]).slice().reverse().map(h=>`<div class="small"><span class="mono tiny muted">${h.q}</span> ${esc(h.chi)} — ${esc(h.n)}</div>`).join("")||'<p class="small muted">Nessuna modifica: dati originali.</p>'}</div>`
+  };
+  const schede=`<div class="tabbar" role="tablist">${SCHEDE_ART.map(([k,l])=>`<button role="tab" data-act="tab" data-k="atab" data-v="${k}" aria-selected="${tab===k}">${l}${mancaIn(k)?`<span class="tab-n warn" title="${mancaIn(k)} dati mancanti">${mancaIn(k)}</span>`:""}${k==="comp"&&a.comp?.length?`<span class="tab-n">${a.comp.length}</span>`:""}</button>`).join("")}</div>`;
   const foot=`<button class="btn" data-act="close-drawer">Chiudi</button><span class="grow"></span>${ro?"":`<button class="btn btn-ghost" data-act="ai" data-c="${esc(c)}">${icon("spark",15)} Arricchisci con AI</button>
-      <button class="btn" data-act="foto-da" data-c="${esc(c)}">${icon("cam",15)} Aggiungi foto</button>
       ${a.stato==="revisione"&&state.ruolo==="curatore"?`<button class="btn" data-act="scarta" data-c="${esc(c)}">Rimanda</button><button class="btn btn-primary" data-act="approva" data-c="${esc(c)}">Approva e pubblica</button>`:a.stato!=="pubblicato"&&a.stato!=="revisione"?`<button class="btn btn-primary" data-act="invia" data-c="${esc(c)}">Invia in revisione</button>`:""}`}`;
-  fillDrawer(`${a.b} · ${cap(a.k1)} › ${cap(a.k2)}`,a.t||a.d,`<div class="detail-layout"><div class="detail-full">${testa}</div>
-      <div class="detail-main">${descr}${classi}${uso}${comp}${foto}</div><div class="detail-side">${misure}${comm}${storico}</div></div>`,foot);
+  fillDrawer(`${a.b} · ${cap(a.k1)} › ${cap(a.k2)}`,a.t||a.d,`<div class="art">${riep}<section class="art-main">${schede}<div class="art-pane">${corpo[tab]()}</div></section></div>`,foot);
 }
 const suggerisciComp=a=>{const parola=(a.t||a.d).split(/\s+/).find(w=>w.length>3&&!/poltrona|divano|pouf|tavolo|sedia/i.test(w))||"";
   return ARTICOLI().filter(x=>x.b!==a.b&&(/copertur|fodera|struttur|piano|gamba|telo|zavorr|cuscin/i.test(x.d))&&(!parola||x.d.toLowerCase().includes(parola.toLowerCase())||x.k1===a.k1)).slice(0,40);};
