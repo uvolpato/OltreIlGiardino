@@ -164,3 +164,11 @@ dialog.confirm{width:min(440px,94vw)}
 .addc input,.addc select{width:auto; flex:1 1 140px; min-width:0}
 .addc input[type=date],.addc input[type=number]{flex:0 0 130px}
 .addc .btn{flex:none}
+/* propagazione delle caratteristiche comuni */
+dialog.form.prop{width:min(1080px,94vw)}
+.prop-g{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:20px}
+.prop-l{display:grid; gap:2px; max-height:52vh; overflow:auto; border:1px solid var(--border); border-radius:var(--r); padding:4px}
+.prop-r{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer}
+.prop-r:hover{background:var(--sunken)}
+.prop-r input{width:auto; min-height:0; accent-color:var(--accent)}
+@media (max-width:760px){ .prop-g{grid-template-columns:1fr} .prop-l{max-height:34vh} }

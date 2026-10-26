@@ -14,6 +14,7 @@
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Ugo | Prima bozza dalle richieste del 20/10 |
 | 0.2 | 2026-10-21 | Ugo | Analisi del file articoli IBED (§2bis); codici, classificazioni, colori e varianti allineati ai dati reali |
+| 0.5 | 2026-10-26 | Ugo | Varianti come articoli indipendenti: raggruppamento per modello facoltativo (preferenza utente), campi comuni con richiesta di propagazione al salvataggio, procedura «Propaga caratteristiche comuni a…» |
 | 0.4 | 2026-10-26 | Ugo | Il catalogo è la fonte unica anche per prezzi e fornitori (l'ERP riceve). Prezzi di acquisto/vendita/noleggio, fornitori multipli, storico costi, tipo finito/componente, navigazione obbligatoria categoria → sottocategoria, giacenza fisica, controllo foto ↔ codice. Schema `Catalogo/schema.prisma`, audit `Catalogo/AUDIT_Anagrafica_Articoli.md` |
 | 0.3 | 2026-10-26 | Ugo | Nome della piattaforma: **Oltre Il Giardino** (non «Serra»). Prototipo allineato alla suite: stessi componenti della Logistica; scheda articolo a schede con riepilogo fisso, responsive (§5.7) |
 

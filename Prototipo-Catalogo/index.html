@@ -785,6 +785,14 @@ dialog.confirm{width:min(440px,94vw)}
 .addc input,.addc select{width:auto; flex:1 1 140px; min-width:0}
 .addc input[type=date],.addc input[type=number]{flex:0 0 130px}
 .addc .btn{flex:none}
+/* propagazione delle caratteristiche comuni */
+dialog.form.prop{width:min(1080px,94vw)}
+.prop-g{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:20px}
+.prop-l{display:grid; gap:2px; max-height:52vh; overflow:auto; border:1px solid var(--border); border-radius:var(--r); padding:4px}
+.prop-r{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer}
+.prop-r:hover{background:var(--sunken)}
+.prop-r input{width:auto; min-height:0; accent-color:var(--accent)}
+@media (max-width:760px){ .prop-g{grid-template-columns:1fr} .prop-l{max-height:34vh} }
 </style>
 <script src="assets/articoli.js"></script>
 <!-- listino completo (escluso da git) se presente in locale, altrimenti la copia pubblicabile (Catalogo/pubblica.py) -->
@@ -1034,7 +1042,89 @@ const conOv=a=>{ const x={...a,...(DB.ov[a.c]||{})};
 const fotoFuori=a=>(a.foto||[]).filter(f=>!f.toUpperCase().startsWith(a.c.toUpperCase()+"_"));
 const art=c=>{const a=CAT.articoli.find(x=>x.c===c)||DB.nuovi.find(x=>x.c===c); return a?conOv(a):null;};
 const setArt=(c,patch,nota)=>{const prev=DB.ov[c]||{}; DB.ov[c]={...prev,...patch,storico:[...(prev.storico||[]),{q:oggi(),chi:RUOLO_N[state.ruolo]||"—",n:nota||Object.keys(patch).join(", ")}]}; save();};
+/* preferenza dell'utente (nel prototipo: del ruolo): raggruppare le varianti di colore per modello */
+const raggruppa=()=>(DB.pref?.[state.ruolo]?.raggruppa)!==false;
 const gruppi=()=>{const m=new Map(); ARTICOLI().forEach(a0=>{const a=conOv(a0); if(!m.has(a.b)) m.set(a.b,[]); m.get(a.b).push(a);}); return [...m.values()];};
+
+/* ---------- varianti: campi comuni e propagazione ----------
+   Le varianti di colore di un modello restano articoli completi e indipendenti. I campi qui sotto sono
+   «comuni» (di solito uguali in tutte le varianti): cambiandone uno si chiede se applicarlo anche alle altre,
+   e «Propaga caratteristiche comuni» li copia da un articolo ad altri a scelta.
+   Non sono comuni: codice, colore, nome e descrizioni (contengono il colore), foto, colori RGB, giacenza, stato, composizione. */
+const CAMPI_COMUNI=[["k1","Classe"],["k2","Sottoclasse"],["k3","Tipologia"],["tipo","Tipo articolo"],["L","Lunghezza"],["P","Profondità"],["H","Altezza"],["D","Diametro"],
+  ["vol","Volume imballato"],["peso","Peso"],["pila","Pezzi per pila"],["pers","Persone per spostarlo"],["tCar","Carico per pezzo"],["tMon","Montaggio per pezzo"],
+  ["funz","Funzione"],["stili","Stile"],["temi","Temi"],["attr","Caratteristiche"],["prezzi","Prezzi"],["forn","Fornitori"]];
+const COMUNE=Object.fromEntries(CAMPI_COMUNI);
+const varianti=c=>{const a=art(c); return a?ARTICOLI().map(conOv).filter(x=>x.b===a.b&&x.c!==c):[];};
+const uguale=(x,y)=>JSON.stringify(x??null)===JSON.stringify(y??null);
+const mostraVal=(k,v)=>v==null||v===""||(Array.isArray(v)&&!v.length)?"—":k==="prezzi"?["acquisto","vendita","noleggio"].map(p=>v[p]!=null?`${p[0].toUpperCase()} € ${num(v[p],2)}`:null).filter(Boolean).join(" · ")||"—"
+  :k==="forn"?v.map(f=>f.nome).join(", "):Array.isArray(v)?v.join(", "):k==="k1"||k==="k2"||k==="k3"?cap(String(v)):String(v);
+/* scelta fino alla chiusura della scheda: "uno" | "tutti" (per non chiedere a ogni campo) */
+const PROP={};
+/* dialog a più scelte, stessa struttura di UI.conferma */
+const scegli=({titolo,testo,scelte,ricorda})=>new Promise(res=>{
+  const d=document.createElement("dialog"); d.className="confirm";
+  d.innerHTML=`<div class="dlg-head"><h2 class="grow">${esc(titolo)}</h2></div><div class="dlg-body"><p>${testo}</p>${ricorda?`<label class="chk" style="margin-top:10px"><input type="checkbox" id="sc-ric"> ${esc(ricorda)}</label>`:""}</div>
+    <div class="dlg-foot">${scelte.map(([v,l,cls],i)=>`<button class="btn ${cls||""}" value="${v}">${esc(l)}</button>`).join("")}</div>`;
+  document.body.append(d);
+  d.querySelectorAll(".dlg-foot button").forEach(b=>b.onclick=()=>{d.returnValue=b.value; closeDlg(d);});
+  d.addEventListener("close",()=>{res({v:d.returnValue||scelte[0][0],ricorda:!!d.querySelector("#sc-ric")?.checked}); d.remove();});
+  showDlg(d); d.querySelector(".dlg-foot .btn:last-child").focus();
+});
+/* salva una modifica; se tocca campi comuni e l'articolo ha varianti, chiede se applicarla anche a quelle.
+   perAltri: x=>patch per ogni altra variante (per i tag si aggiunge/toglie la voce, non si sovrascrive l'elenco) */
+/* le richieste vanno in coda: un campo può generare due «change» (modifica e uscita), e la seconda
+   trova i valori già allineati e non chiede più nulla */
+let _codaProp=Promise.resolve();
+const salvaCampo=(...arg)=>(_codaProp=_codaProp.then(()=>_salvaCampo(...arg)).catch(()=>{}));
+async function _salvaCampo(c,patch,nota,perAltri=()=>patch){
+  const prima=art(c); if(Object.keys(patch).every(k=>uguale(prima[k],patch[k]))) return;
+  setArt(c,patch,nota);
+  const comuni=Object.keys(patch).filter(k=>COMUNE[k]), altre=varianti(c).filter(x=>comuni.some(k=>!uguale(x[k],perAltri(x)[k])));
+  if(!comuni.length||!altre.length) return dopo("Scheda aggiornata");
+  let scelta=PROP[c];
+  if(!scelta){ render();
+    const r=await scegli({titolo:"Applicare anche alle altre varianti?",ricorda:"Ricorda la scelta finché la scheda è aperta",
+      testo:`Hai cambiato <strong>${esc(comuni.map(k=>COMUNE[k]).join(", "))}</strong>. ${altre.length===1?"Un'altra variante ha":`${altre.length} altre varianti hanno`} un valore diverso: ${altre.map(x=>`<span class="mono">${esc(x.c)}</span>`).join(", ")}.`,
+      scelte:[["uno","Solo questa variante"],["tutti",`Anche alle altre ${altre.length}`,"btn-primary"]]});
+    scelta=r.v; if(r.ricorda) PROP[c]=scelta; }
+  if(scelta==="tutti"){ altre.forEach(x=>setArt(x.c,perAltri(x),`${nota} (propagato da ${c})`)); dopo(`Aggiornate anche ${altre.length} varianti`); }
+  else dopo("Scheda aggiornata");
+}
+/* procedura esplicita: «Propaga caratteristiche comuni a…» */
+function dialogPropaga(c){
+  const a=art(c), cand=ARTICOLI().map(conOv).filter(x=>x.c!==c&&(x.b===a.b||x.k2===a.k2));
+  const st={camp:new Set(CAMPI_COMUNI.map(([k])=>k).filter(k=>a[k]!=null&&!(Array.isArray(a[k])&&!a[k].length))),dest:new Set(varianti(c).map(x=>x.c)),q:""};
+  const d=document.createElement("dialog"); d.className="form prop"; d.id="propDlg";
+  const disegna=()=>{
+    const dest=cand.filter(x=>st.dest.has(x.c)), diff=k=>dest.filter(x=>!uguale(x[k],a[k])).length;
+    const elenco=cand.filter(x=>st.dest.has(x.c)||x.b===a.b||(st.q.length>1&&(x.c+" "+x.d).toLowerCase().includes(st.q.toLowerCase()))).slice(0,60);
+    d.querySelector(".dlg-body").innerHTML=`<p class="small muted" style="margin:0">Da <strong>${esc(a.t||a.d)}</strong> <span class="mono">${esc(c)}</span> agli articoli scelti. Nome, descrizioni, colore, foto e giacenza non si copiano.</p>
+      <div class="prop-g"><section><div class="row"><b class="small grow">Caratteristiche da copiare</b><button class="btn btn-sm btn-ghost" data-pp="tutte">Tutte</button><button class="btn btn-sm btn-ghost" data-pp="diverse">Solo le diverse</button></div>
+        <div class="prop-l">${CAMPI_COMUNI.map(([k,l])=>`<label class="prop-r"><input type="checkbox" data-pk="${k}"${st.camp.has(k)?" checked":""}><span class="grow"><strong>${esc(l)}</strong><span class="small muted"> ${esc(mostraVal(k,a[k]))}</span></span>${dest.length?(diff(k)?UI.stato(`diverso in ${diff(k)}`,"warn"):UI.stato("uguale","ok")):""}</label>`).join("")}</div></section>
+      <section><b class="small">Articoli che ricevono · ${dest.length}</b>
+        <input type="search" id="pp-q" placeholder="Aggiungi altri articoli: cerca codice o nome…" value="${esc(st.q)}" aria-label="Cerca articoli" style="margin:8px 0">
+        <div class="prop-l">${elenco.map(x=>`<label class="prop-r"><input type="checkbox" data-pd="${esc(x.c)}"${st.dest.has(x.c)?" checked":""}>${sw(RGB[x.cc]||"#ddd")}<span class="grow"><span class="mono small">${esc(x.c)}</span> <span class="small">${esc(x.t||x.d)}</span></span>${x.b===a.b?UI.stato("variante",""):""}</label>`).join("")||'<p class="small muted">Nessun articolo.</p>'}</div></section></div>`;
+    const n=dest.length*[...st.camp].filter(k=>diff(k)).length;
+    d.querySelector('[data-pp="ok"]').disabled=!dest.length||!st.camp.size;
+    d.querySelector('[data-pp="ok"]').textContent=dest.length&&st.camp.size?`Copia su ${dest.length} ${dest.length===1?"articolo":"articoli"}`:"Copia";
+    d.querySelector(".prop-n").textContent=n?`${n} valori cambieranno`:"Nessun valore cambierà";
+  };
+  d.innerHTML=`<div class="dlg-head"><h2 class="grow">Propaga caratteristiche comuni</h2></div><div class="dlg-body"></div>
+    <div class="dlg-foot"><span class="small muted grow prop-n"></span><button class="btn" data-pp="no">Annulla</button><button class="btn btn-primary" data-pp="ok">Copia</button></div>`;
+  d.addEventListener("click",ev=>{ const b=ev.target.closest("[data-pp]"); if(!b) return; const v=b.dataset.pp;
+    if(v==="no") return closeDlg(d);
+    if(v==="tutte"){ CAMPI_COMUNI.forEach(([k])=>st.camp.add(k)); return disegna(); }
+    if(v==="diverse"){ const dest=cand.filter(x=>st.dest.has(x.c)); st.camp=new Set(CAMPI_COMUNI.map(([k])=>k).filter(k=>dest.some(x=>!uguale(x[k],a[k])))); return disegna(); }
+    if(v==="ok"){ const campi=[...st.camp], dest=[...st.dest];
+      dest.forEach(t=>{ const x=art(t), patch=Object.fromEntries(campi.filter(k=>!uguale(x[k],a[k])).map(k=>[k,structuredClone(a[k]??null)])); if(Object.keys(patch).length) setArt(t,patch,`caratteristiche copiate da ${c}: ${Object.keys(patch).map(k=>COMUNE[k]).join(", ")}`); });
+      closeDlg(d); dopo(`Caratteristiche copiate su ${dest.length} ${dest.length===1?"articolo":"articoli"}`); } });
+  d.addEventListener("change",ev=>{ const el=ev.target;
+    if(el.dataset.pk){ el.checked?st.camp.add(el.dataset.pk):st.camp.delete(el.dataset.pk); disegna(); }
+    if(el.dataset.pd){ el.checked?st.dest.add(el.dataset.pd):st.dest.delete(el.dataset.pd); disegna(); } });
+  d.addEventListener("input",ev=>{ if(ev.target.id==="pp-q"){ st.q=ev.target.value; const pos=ev.target.selectionStart; disegna(); const q=d.querySelector("#pp-q"); q.focus(); q.setSelectionRange(pos,pos); } });
+  document.body.append(d); d.addEventListener("close",()=>d.remove()); disegna(); showDlg(d);
+}
 
 /* completezza della scheda (§6 del PRD) */
 const CHECK=[["foto","Foto principale",a=>a.foto?.length||a.fotoNuove?.length],["desc","Descrizione estesa",a=>(a.e||"").length>20],
@@ -1126,19 +1216,19 @@ function navCategorie(tutti,st){
   const k1=st.seg.k1, cur=state.ruolo==="curatore", pin=DB.catOrd||[];
   const conta=f=>tutti.filter(f).length;
   const voci=k1?ordCat(classi2(k1)).map(k2=>[k2,conta(g=>g[0].k1===k1&&g[0].k2===k2),"k2"]).filter(x=>x[1]):ordCat(CLASSI1).map(k=>[k,conta(g=>g[0].k1===k),"k1"]);
-  const tile=([n,q,liv])=>`<div class="cat-t"><button class="pc cat-b" data-act="dt-seg" data-dt="cat" data-g="${liv}" data-v="${esc(n)}"><div class="pc-b"><div class="pc-t">${esc(cap(n))}</div><span class="small muted">${num(q,0)} ${q===1?"modello":"modelli"}</span></div></button>
+  const tile=([n,q,liv])=>`<div class="cat-t"><button class="pc cat-b" data-act="dt-seg" data-dt="cat" data-g="${liv}" data-v="${esc(n)}"><div class="pc-b"><div class="pc-t">${esc(cap(n))}</div><span class="small muted">${num(q,0)} ${q===1?(raggruppa()?"modello":"articolo"):(raggruppa()?"modelli":"articoli")}</span></div></button>
     ${cur&&liv==="k1"?`<button class="icon-btn cat-pin${pin.includes(n)?" on":""}" data-act="cat-pin" data-v="${esc(n)}" aria-label="${pin.includes(n)?"Togli dalla testa":"Metti in testa"}: ${esc(cap(n))}" title="${pin.includes(n)?"In testa all'elenco: clicca per tornare in ordine alfabetico":"Metti in testa all'elenco"}">★</button>`:""}</div>`;
   return `<div class="pgrid cat-grid">${voci.map(tile).join("")}</div>`;
 }
 const briciole=st=>`<nav class="crumbs" aria-label="Percorso"><button class="btn btn-sm btn-ghost" data-act="cat-nav" data-v="">Tutte le categorie</button>${st.seg.k1?` › <button class="btn btn-sm btn-ghost" data-act="cat-nav" data-v="k1">${esc(cap(st.seg.k1))}</button>`:""}${st.seg.k2?` › <strong>${esc(cap(st.seg.k2))}</strong>`:""}${st.q?` · <span class="muted">risultati della ricerca in ${st.seg.k2?"questa sottocategoria":st.seg.k1?"questa categoria":"tutto il catalogo"}</span>`:""}</nav>`;
 function viewCatalogo(){
-  const tutti=gruppi(), list=UI.filtra("cat",tutti,testoGruppo,CAMPI_CAT).sort((a,b)=>a[0].b.localeCompare(b[0].b)), st=dtStato("cat"), cnt=(g,v)=>UI.conta("cat",tutti,testoGruppo,CAMPI_CAT,g,v);
+  const tutti=raggruppa()?gruppi():ARTICOLI().map(a=>[conOv(a)]), unita=raggruppa()?["modello","modelli"]:["articolo","articoli"], list=UI.filtra("cat",tutti,testoGruppo,CAMPI_CAT).sort((a,b)=>a[0].b.localeCompare(b[0].b)), st=dtStato("cat"), cnt=(g,v)=>UI.conta("cat",tutti,testoGruppo,CAMPI_CAT,g,v);
   const naviga=!st.q&&!st.seg.k2;
   const filtri=naviga?UI.filtri({id:"cat",cerca:"Cerca in tutto il catalogo: codice, descrizione, fornitore, tema…"}):UI.filtri({id:"cat",cerca:"Cerca codice, descrizione, fornitore, tema…",segmenti:[
       {nome:"st",etichetta:"Stato",voci:[["","Tutti",cnt("st")],...STATI.map(s=>[s,s,cnt("st",s)])]},
       {nome:"tipo",etichetta:"Tipo",voci:[["","Tutti"],["finito","Articoli finiti",cnt("tipo","finito")],["componente","Componenti",cnt("tipo","componente")]]}]})
     +(naviga?"":`<div class="row wrap colfil" role="group" aria-label="Colore"><span class="tiny muted">Colore</span>${Object.entries(FAMCOL).map(([f,h])=>`<button class="swb${st.seg.col===f?" on":""}" data-act="dt-seg" data-dt="cat" data-g="col" data-v="${st.seg.col===f?"":f}" title="${f}" aria-pressed="${st.seg.col===f}">${sw(h,f)}</button>`).join("")}</div>`);
-  const vista=`<div class="seg" role="group" aria-label="Vista"><button data-act="vista" data-v="griglia" aria-pressed="${state.vista==="griglia"}">Griglia</button><button data-act="vista" data-v="tabella" aria-pressed="${state.vista==="tabella"}">Tabella</button></div>`;
+  const vista=`<label class="chk"><input type="checkbox" id="pref-raggr"${raggruppa()?" checked":""}>Raggruppa le varianti</label><div class="seg" role="group" aria-label="Vista"><button data-act="vista" data-v="griglia" aria-pressed="${state.vista==="griglia"}">Griglia</button><button data-act="vista" data-v="tabella" aria-pressed="${state.vista==="tabella"}">Tabella</button></div>`;
   /* la datatable tratta gli array come celle: ogni gruppo va incapsulato in {g} */
   const corpo=naviga?navCategorie(tutti,st):state.vista==="tabella"?UI.datatable({id:"cat",righe:list.map(g=>({g})),perPagina:48,ordIniziale:{key:"b",dir:"asc"},vuoto:"Nessun articolo con questi filtri",suggerimento:"Cambia la ricerca o togli i filtri.",
       riga:({g})=>({act:`data-act="apri" data-c="${esc(g[0].c)}"`}),colonne:[
@@ -1150,7 +1240,7 @@ function viewCatalogo(){
       {key:"st",t:"Stato",tipo:"stato",valore:({g})=>statoArt(g[0])[0],cella:({g})=>UI.stato(...statoArt(g[0]))}]})
     :griglia(list);
   return `<section class="kpis">${UI.kpi(num(ARTICOLI().length,0),"articoli")}${UI.kpi(num(tutti.length,0),"modelli (con varianti)")}${UI.kpi(num(ARTICOLI().filter(a=>compl(conOv(a))===1).length,0),"schede complete",["obiettivo 80%","info"])}${UI.kpi(cnt("st","Da revisionare"),"da revisionare")}</section>
-    ${UI.pannello({titolo:naviga?(st.seg.k1?`${esc(cap(st.seg.k1))}: scegli la sottocategoria`:"Scegli la categoria"):`${num(list.length,0)} modelli`,azioni:naviga?"":vista,aiuto:"vista-catalogo",corpo:`<div class="card-body dt-filtri">${briciole(st)}${filtri}</div>${corpo}`})}`;
+    ${UI.pannello({titolo:naviga?(st.seg.k1?`${esc(cap(st.seg.k1))}: scegli la sottocategoria`:"Scegli la categoria"):`${num(list.length,0)} ${list.length===1?unita[0]:unita[1]}`,azioni:naviga?`<label class="chk"><input type="checkbox" id="pref-raggr"${raggruppa()?" checked":""}>Raggruppa le varianti</label>`:vista,aiuto:"vista-catalogo",corpo:`<div class="card-body dt-filtri">${briciole(st)}${filtri}</div>${corpo}`})}`;
 }
 /* griglia a schede: stessa paginazione e stesso piede della datatable (stato in dtStato("cat")) */
 function griglia(list){
@@ -1168,7 +1258,7 @@ function griglia(list){
 
 /* ---------- SCHEDA ARTICOLO (stesso pannello del dettaglio ordine) ---------- */
 function openDrawer(fn){ state.drawer=fn; fn(); $("drawer").classList.add("open"); $("scrim").classList.add("open"); }
-function closeDrawer(){ state.drawer=null; state.sel=null; $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); $("drawerFoot").hidden=true; }
+function closeDrawer(){ Object.keys(PROP).forEach(k=>delete PROP[k]); state.drawer=null; state.sel=null; $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); $("drawerFoot").hidden=true; }
 function fillDrawer(kicker,title,html,foot=""){ $("drawerKicker").textContent=kicker; $("drawerTitle").textContent=title; const sc=$("drawerBody").scrollTop; $("drawerBody").innerHTML=html; $("drawerBody").scrollTop=sc; $("drawerFoot").innerHTML=foot; $("drawerFoot").hidden=!foot; }
 const apri=c=>{ if(!state.drawer) state.atab="scheda"; state.sel=c; openDrawer(drawerArticolo); $("drawerBody").scrollTop=0; };
 /* scheda articolo: a sinistra il riepilogo sempre visibile (foto, stato, varianti, cosa manca),
@@ -1191,6 +1281,7 @@ function drawerArticolo(){
     <div class="row wrap" style="gap:4px">${UI.stato(s,t)}${UI.stato(a.tipo==="componente"?"Componente":"Articolo finito",a.tipo==="componente"?"info":"")}${a.dup?UI.stato("codice duplicato","err"):""}${fotoFuori(a).length?UI.stato("foto di un altro codice","err"):""}${a.nuovo?UI.stato("censito da telefono","info"):""}${a.ai?UI.stato("proposta AI da controllare","warn"):""}</div>
     ${UI.dettagli([["Codice",`<span class="mono">${esc(c)}</span>`],["Classe",`${esc(cap(a.k1))} › ${esc(cap(a.k2))}${a.k3?` › ${esc(cap(a.k3))}`:""}`],["Colore",a.cc?`${sw(RGB[a.cc]||"#ddd")} ${esc(a.cc)} ${esc(nomeColore(a.cc))}`:"—"],["Misure",esc(a.dim||"—")]])}
     ${g.length>1?`<div><div class="eyebrow">Varianti · ${g.length}</div><div class="var">${g.map(x=>`<button class="vb${x.c===c?" on":""}" data-act="apri" data-c="${esc(x.c)}" title="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")}<span>${esc(nomeColore(x.cc)||x.cc||x.d)}</span></button>`).join("")}</div></div>`:""}
+    ${ro?"":`<button class="btn btn-sm" data-act="propaga" data-c="${esc(c)}">Propaga caratteristiche comuni a…</button>`}
     <div><div class="row"><span class="eyebrow grow">Scheda completa</span>${UI.misura(Math.round(compl(a)*100),100,"%")}</div>
       ${manca.length?`<ul class="art-manca">${manca.map(([k,l])=>`<li><button class="btn btn-sm btn-ghost" data-act="tab" data-k="atab" data-v="${CHECK_TAB[k]}">○ ${esc(l)} ›</button></li>`).join("")}</ul>`:'<p class="small" style="color:var(--ok)">✓ Tutti i dati richiesti ci sono</p>'}</div>
   </aside>`;
@@ -1475,6 +1566,7 @@ document.addEventListener("click",async ev=>{
     case "dt-seg": { const st=dtStato(b.dataset.dt); st.seg[b.dataset.g]=b.dataset.v; st.pag=0; render(); break; }
     case "dt-reset": { const st=dtStato(b.dataset.dt); st.q=""; st.seg={}; st.pag=0; render(); break; }
     case "vista": state.vista=v; render(); break;
+    case "propaga": dialogPropaga(c); break;
     case "cat-nav": { const st=dtStato("cat"); st.seg.k2=""; if(!v) st.seg.k1=""; st.q=""; st.pag=0; render(); break; }
     case "cat-pin": { const pin=DB.catOrd||[]; DB.catOrd=pin.includes(v)?pin.filter(x=>x!==v):[...pin,v]; save(); render(); break; }
     case "forn-add": { const n=$("nf-nome").value.trim(); if(!n) return toast("Scrivi il nome del fornitore","warn"); const a=art(c);
@@ -1526,12 +1618,14 @@ document.addEventListener("change",async ev=>{
   if(el.dataset.f&&el.dataset.c){ const k=el.dataset.f, val=el.type==="number"?(el.value===""?null:+el.value):el.value;
     const patch={[k]:val}; if(k==="k1"){patch.k2=classi2(val)[0]; patch.k3=classi3(val,patch.k2)[0];} if(k==="k2") patch.k3=classi3(art(el.dataset.c).k1,val)[0];
     if(k==="giacenza") patch.giacenzaIl=oggi();
-    setArt(el.dataset.c,patch,`${k} modificato`); dopo("Scheda aggiornata"); }
+    return salvaCampo(el.dataset.c,patch,`${COMUNE[k]||k} modificato`); }
   if(el.dataset.prezzo&&el.dataset.c){ const a=art(el.dataset.c), k=el.dataset.prezzo, v=el.value===""?null:+el.value;
     if(v!=null&&v<0) return toast("Il prezzo non può essere negativo","warn");
-    setArt(el.dataset.c,{prezzi:{...a.prezzi,[k]:v}},`prezzo di ${k}: ${v==null?"tolto":"€ "+num(v,2)}`); dopo("Prezzo aggiornato"); }
+    return salvaCampo(el.dataset.c,{prezzi:{...a.prezzi,[k]:v}},`prezzo di ${k}: ${v==null?"tolto":"€ "+num(v,2)}`,x=>({prezzi:{...x.prezzi,[k]:v}})); }
   if(el.dataset.tag&&el.dataset.c){ const a=art(el.dataset.c), f=el.dataset.tag, cur=a[f]||[];
-    setArt(el.dataset.c,{[f]:el.checked?[...cur,el.value]:cur.filter(x=>x!==el.value)},`${f}: ${el.value}`); dopo(); }
+    const tog=l=>el.checked?[...new Set([...(l||[]),el.value])]:(l||[]).filter(x=>x!==el.value);
+    return salvaCampo(el.dataset.c,{[f]:tog(cur)},`${COMUNE[f]}: ${el.checked?"+":"−"} ${el.value}`,x=>({[f]:tog(x[f])})); }
+  if(el.id==="pref-raggr"){ DB.pref={...DB.pref,[state.ruolo]:{...(DB.pref?.[state.ruolo]||{}),raggruppa:el.checked}}; save(); dtStato("cat").pag=0; render(); }
   if(el.id==="np-base") $("np-t").value=PROMPT_STD[+el.value].t;
   if(el.id==="m-file"&&el.files.length){ m.foto=[...(m.foto||[]),...await Promise.all([...el.files].map(leggiFile))]; rm(); }
   if(el.dataset.mp){ m.pid=+el.value; m.ptesto=null; rm(); }
