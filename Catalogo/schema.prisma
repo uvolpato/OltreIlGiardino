@@ -123,6 +123,7 @@ model Articolo {
   prezzoAcquisto   Decimal?       @db.Decimal(10, 2)
   prezzoVendita    Decimal?       @db.Decimal(10, 2)
   prezzoNoleggio   Decimal?       @db.Decimal(10, 2)
+  giorniNoleggio   Int?           @default(1) // giorni coperti dal prezzo di noleggio
 
   // giacenza fisica, allineata a mano in vista del nuovo magazzino
   giacenzaFisica   Int?

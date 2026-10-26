@@ -14,6 +14,8 @@ Ambito: prototipo `Prototipo-Catalogo/` (sorgenti `Catalogo/app.js`, `Catalogo/c
 | 2.1 | Articolo finito vs componente | Assente (solo anomalia «copertura») | Campo **Tipo articolo**, proposto dal nome per i 2.194 articoli (coperture, fodere, strutture → componente), filtro nel catalogo, etichetta nella scheda |
 | 2.2 | Distinta base | Presente (ruoli parte, anima, rivestimento, struttura; «usato come componente in») | Invariata; i componenti proposti sono prima quelli di tipo componente; avviso se un componente non è collegato a nessun articolo |
 | 2.3 | Varianti colore sulla scala aziendale | Presente (codice `-CC`, scala colori del file) | Invariato; schema `Colore` |
+| 2.5 | Duplicazione | — | Duplica come variante (stesso modello) o come articolo a sé (nuovo modello). API: `POST /articoli/{codice}/duplica {modo, colore, nome}` |
+| 1.4 | Giorni coperti dal noleggio | — | `giorniNoleggio` (default 1) accanto al prezzo di noleggio |
 | 2.4 | Varianti indipendenti, campi comuni allineabili | — | Raggruppamento facoltativo per utente; propagazione dei campi comuni al salvataggio e procedura «Propaga caratteristiche comuni a…». API: `POST /articoli/{codice}/propaga {campi, destinatari}` |
 | 3.1 | Navigazione Categoria → Sottocategoria → Prodotti | Tutti i prodotti mescolati, filtro per classe opzionale | **Obbligatoria**: si sceglie la categoria, poi la sottocategoria, solo allora compaiono i prodotti; percorso cliccabile. La ricerca resta su tutto il catalogo |
 | 3.2 | Ordinamento | Nessuno definito | Categorie in ordine alfabetico, con la ★ il curatore ne mette in testa alcune (ordine personalizzato); prodotti ordinati per codice |

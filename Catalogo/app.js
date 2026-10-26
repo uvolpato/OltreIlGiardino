@@ -81,7 +81,7 @@ const COMUNE=Object.fromEntries(CAMPI_COMUNI);
 const ingombro=a=>{const m=k=>a[k+"x"]||a[k]; return m("L")&&m("P")&&m("H")?m("L")*m("P")*m("H")/1e6:m("D")&&m("H")?Math.PI*(m("D")/2)**2*m("H")/1e6:null;};
 const varianti=c=>{const a=art(c); return a?ARTICOLI().map(conOv).filter(x=>x.b===a.b&&x.c!==c):[];};
 const uguale=(x,y)=>JSON.stringify(x??null)===JSON.stringify(y??null);
-const mostraVal=(k,v)=>v==null||v===""||(Array.isArray(v)&&!v.length)?"—":k==="prezzi"?["acquisto","vendita","noleggio"].map(p=>v[p]!=null?`${p[0].toUpperCase()} € ${num(v[p],2)}`:null).filter(Boolean).join(" · ")||"—"
+const mostraVal=(k,v)=>v==null||v===""||(Array.isArray(v)&&!v.length)?"—":k==="prezzi"?[...["acquisto","vendita","noleggio"].map(p=>v[p]!=null?`${p[0].toUpperCase()} € ${num(v[p],2)}`:null),v.giorni?`${v.giorni} gg`:null].filter(Boolean).join(" · ")||"—"
   :k==="forn"?v.map(f=>f.nome).join(", "):Array.isArray(v)?v.join(", "):k==="k1"||k==="k2"||k==="k3"?cap(String(v)):String(v);
 /* scelta fino alla chiusura della scheda: "uno" | "tutti" (per non chiedere a ogni campo) */
 const PROP={};
@@ -208,6 +208,44 @@ function dialogCosto(c){
     <div class="dlg-foot"><button class="btn" data-act="dlg-close">Annulla</button><button class="btn btn-primary" data-act="costo-add" data-c="${esc(c)}">Registra</button></div>`;
   document.body.append(d); d.addEventListener("close",()=>d.remove()); showDlg(d); $("nk-imp").focus();
 }
+
+/* ---------- duplica articolo ----------
+   Le varianti si aggregano per «modello» = codice senza «-CC» (es. SEDIV13001-01 e SEDIV13001-80).
+   - come variante: stesso modello, nuovo codice colore → SEDIV13001-CC
+   - come articolo a sé: nuovo progressivo nella stessa classe/sottoclasse/materiale → SEDIV13NNN-CC
+   Si copia tutto tranne codice, colore, foto, colori RGB, giacenza, costi, stato e storico. */
+const NON_COPIARE=["c","b","cc","foto","fotoNuove","rgb","giacenza","giacenzaIl","costi","stato","storico","dup","ai","nuovo"];
+function nuovoModello(a){ const pre=a.b.slice(0,7);
+  if(!/^[A-Z]{5}\d{2}$/.test(pre)) return a.b+"B";   // ponytail: codice fuori schema → suffisso B, da ricodificare
+  const usati=ARTICOLI().filter(x=>x.b.startsWith(pre)).map(x=>+x.b.slice(7,10)||0);
+  return pre+String(Math.max(0,...usati)+1).padStart(3,"0"); }
+function dialogDuplica(c){
+  const a=art(c), usati=new Set(ARTICOLI().filter(x=>x.b===a.b).map(x=>x.cc)), liberi=Object.entries(CAT.colori).filter(([k])=>!usati.has(k));
+  const d=document.createElement("dialog"); d.className="form"; d.id="dupDlg";
+  const anteprima=()=>{ const comeVar=d.querySelector('[name="dup-modo"]:checked').value==="variante", cc=$("dup-cc").value;
+    $("dup-cod").textContent=`${comeVar?a.b:nuovoModello(a)}-${cc}`;
+    $("dup-nota").textContent=comeVar?`Sarà la variante ${nomeColore(cc)} di «${a.t||a.d}»: si raggrupperà con le altre ${usati.size} varianti.`:"Sarà un modello nuovo, con le sue varianti: non si raggruppa con l'originale."; };
+  d.innerHTML=`<div class="dlg-head"><h2 class="grow">Duplica · ${esc(a.t||a.d)}</h2></div><div class="dlg-body"><div class="fgrid">
+      <div class="full"><span class="fl">Il duplicato diventa</span><div class="chipgroup" role="radiogroup">
+        <label class="chk"><input type="radio" name="dup-modo" value="variante" checked>Una variante di colore dello stesso modello</label>
+        <label class="chk"><input type="radio" name="dup-modo" value="nuovo">Un articolo a sé (modello nuovo)</label></div></div>
+      <div><label class="fl" for="dup-cc">Colore (scala aziendale)</label><select id="dup-cc">${(liberi.length?liberi:Object.entries(CAT.colori)).map(([k,n])=>`<option value="${k}">${k} ${esc(n)}</option>`).join("")}</select></div>
+      <div><span class="fl">Codice proposto</span><p class="mono" id="dup-cod" style="margin:8px 0 0"></p></div>
+      ${UI.campo({id:"dup-t",etichetta:"Nome",valore:a.t||a.d,pieno:true})}</div>
+      <p class="small muted" id="dup-nota"></p>
+      ${UI.nota("Si copiano descrizioni, classe, misure, uso, prezzi, fornitori e composizione. Non si copiano foto, colori RGB, giacenza, costi e storico.")}</div>
+    <div class="dlg-foot"><button class="btn" data-act="dlg-close">Annulla</button><button class="btn btn-primary" data-act="dup-ok" data-c="${esc(c)}">Crea duplicato</button></div>`;
+  d.addEventListener("change",anteprima);
+  document.body.append(d); d.addEventListener("close",()=>d.remove()); showDlg(d); anteprima();
+}
+function creaDuplicato(c){
+  const a=art(c), comeVar=document.querySelector('[name="dup-modo"]:checked').value==="variante", cc=$("dup-cc").value;
+  const b=comeVar?a.b:nuovoModello(a), cod=`${b}-${cc}`, t=$("dup-t").value.trim()||a.t||a.d;
+  if(art(cod)) return toast(`Il codice ${cod} esiste già: scegli un altro colore`,"warn");
+  const copia=structuredClone(Object.fromEntries(Object.entries(a).filter(([k])=>!NON_COPIARE.includes(k))));
+  DB.nuovi.push({...copia,c:cod,b,cc,t,d:t.slice(0,40),nuovo:true,storico:[{q:oggi(),chi:RUOLO_N[state.ruolo],n:`duplicato da ${c} come ${comeVar?"variante":"articolo a sé"}`}]}); save();
+  closeDlg($("dupDlg")); apri(cod); toast(`Creato ${cod}: completa foto e descrizione`);
+}
 /* segnaposto foto: le immagini non sono nel progetto, si mostra un riquadro col colore dell'articolo */
 const ph=(a,cls="")=>{const f=a.fotoNuove?.find(x=>x.main)||a.fotoNuove?.[0];
   if(f) return `<div class="ph ${cls} has-img"><img src="${f.pres||f.orig}" alt="${esc(a.t||a.d)}"></div>`;
@@ -222,6 +260,8 @@ const AIUTI={
   "vista-importa":"<b>Import</b>: cosa è arrivato dal file articoli attuale e le anomalie da sistemare. Clicca una riga per aprire l'articolo.",
   "vista-api":"<b>API e MCP</b>: come ERP, sito, logistica e agenti AI leggono il catalogo. Escono solo gli articoli pubblicati.",
   "sch-misure":"<b>Misure per la logistica</b>: volume e peso da imballato, pezzi per pila e tempi sono i dati che servono al pianificatore per stimare carichi e mezzi.",
+  "sch-varianti":"<b>Varianti</b>: sono gli articoli con lo stesso <b>modello</b>, cioè lo stesso codice prima di «-CC» (es. SEDIV13001-01 e SEDIV13001-80). Ogni variante è un articolo completo; cambiano colore, foto e giacenza. «Duplica…» crea una nuova variante o un articolo a sé.",
+  "prezzo-giorni":"<b>Giorni coperti dal noleggio</b>: per quanti giorni vale il prezzo di noleggio indicato (es. 1 = prezzo giornaliero; 3 = il prezzo copre un evento fino a 3 giorni). Oltre questi giorni il preventivo applica un supplemento, da definire. Vuoto = 1 giorno.",
   "sch-comp":"<b>Composizione</b>: distinta base (struttura, parti), anima e rivestimento, componenti condivisi tra articoli diversi."
 };
 
@@ -351,8 +391,8 @@ function drawerArticolo(){
   const riep=`<aside class="art-side">${ph(a,"side")}
     <div class="row wrap" style="gap:4px">${UI.stato(s,t)}${UI.stato(a.tipo==="componente"?"Componente":"Articolo finito",a.tipo==="componente"?"info":"")}${a.dup?UI.stato("codice duplicato","err"):""}${fotoFuori(a).length?UI.stato("foto di un altro codice","err"):""}${a.nuovo?UI.stato("censito da telefono","info"):""}${a.ai?UI.stato("proposta AI da controllare","warn"):""}</div>
     ${UI.dettagli([["Codice",`<span class="mono">${esc(c)}</span>`],["Classe",`${esc(cap(a.k1))} › ${esc(cap(a.k2))}${a.k3?` › ${esc(cap(a.k3))}`:""}`],["Colore",a.cc?`${sw(RGB[a.cc]||"#ddd")} ${esc(a.cc)} ${esc(nomeColore(a.cc))}`:"—"],["Misure",esc(a.dim||"—")]])}
-    ${g.length>1?`<div><div class="eyebrow">Varianti · ${g.length}</div><div class="var">${g.map(x=>`<button class="vb${x.c===c?" on":""}" data-act="apri" data-c="${esc(x.c)}" title="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")}<span>${esc(nomeColore(x.cc)||x.cc||x.d)}</span></button>`).join("")}</div></div>`:""}
-    ${ro?"":`<button class="btn btn-sm" data-act="propaga" data-c="${esc(c)}">Propaga caratteristiche comuni a…</button>`}
+    ${g.length>1?`<div><div class="eyebrow">Varianti · ${g.length} ${UI.hint("sch-varianti")}</div><div class="var">${g.map(x=>`<button class="vb${x.c===c?" on":""}" data-act="apri" data-c="${esc(x.c)}" title="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")}<span>${esc(nomeColore(x.cc)||x.cc||x.d)}</span></button>`).join("")}</div></div>`:""}
+    ${ro?"":`<div class="row wrap" style="gap:6px"><button class="btn btn-sm" data-act="duplica" data-c="${esc(c)}">Duplica…</button><button class="btn btn-sm" data-act="propaga" data-c="${esc(c)}">Propaga caratteristiche comuni a…</button></div>`}
     <div><div class="row"><span class="eyebrow grow">Scheda completa</span>${UI.misura(Math.round(compl(a)*100),100,"%")}</div>
       ${manca.length?`<ul class="art-manca">${manca.map(([k,l])=>`<li><button class="btn btn-sm btn-ghost" data-act="tab" data-k="atab" data-v="${CHECK_TAB[k]}">○ ${esc(l)} ›</button></li>`).join("")}</ul>`:'<p class="small" style="color:var(--ok)">✓ Tutti i dati richiesti ci sono</p>'}</div>
   </aside>`;
@@ -393,7 +433,9 @@ function drawerArticolo(){
       ${UI.nota("Le foto del file sono indicate per nome: la cartella immagini non è ancora nel progetto.")}`,
     prezzi:()=>{ const P=a.prezzi||{}, pf=(k,l)=>UI.campo({id:"p-"+k,etichetta:l+" (€)",valore:P[k]??"",tipo:"number",attr:`data-prezzo="${k}" data-c="${esc(c)}" step="0.01" min="0"${disP}`});
         const marg=P.vendita&&P.acquisto?Math.round((P.vendita-P.acquisto)/P.vendita*100):null, fin=(k,f,i,attr="")=>`<input class="in-sm" data-fd="${k}" data-c="${esc(c)}" data-i="${i}" value="${esc(f[k]??"")}" ${attr}${disP}>`;
-        return `<div class="art-grp">${testa("Prezzi")}<div class="fgrid g4">${pf("acquisto","Acquisto")}${pf("vendita","Vendita")}${pf("noleggio","Noleggio")}</div>
+        return `<div class="art-grp">${testa("Prezzi")}<div class="fgrid g4">${pf("acquisto","Acquisto")}${pf("vendita","Vendita")}${pf("noleggio","Noleggio")}
+          <div><div class="row" style="gap:4px"><label class="fl" for="p-giorni">Giorni coperti dal noleggio</label>${UI.hint("prezzo-giorni")}</div><input id="p-giorni" type="number" min="1" step="1" value="${esc(P.giorni??"")}" placeholder="1" data-prezzo="giorni" data-c="${esc(c)}"${disP}></div></div>
+          ${P.noleggio&&P.giorni>1?`<p class="small muted">Equivale a € ${num(P.noleggio/P.giorni,2)} al giorno per ${P.giorni} giorni.</p>`:""}
           ${marg!=null?`<p class="small muted">Margine sulla vendita: ${marg}%${P.noleggio&&P.acquisto?` · il noleggio ripaga l'acquisto in ${Math.ceil(P.acquisto/P.noleggio)} noleggi`:""}</p>`:""}</div>
         <div class="art-grp">${testa("Fornitori",(a.forn||[]).length,roP?"":`<button class="btn btn-sm" data-act="forn-add" data-c="${esc(c)}">+ Aggiungi fornitore</button>`)}
           ${UI.tabella({colonne:[{t:"Principale"},{t:"Fornitore"},{t:"Suo codice"},{t:"Prezzo d'acquisto (€)",num:true},{t:"Condizioni"},{t:""}],vuoto:"Nessun fornitore.",righe:(a.forn||[]).map((f,i)=>[
@@ -631,6 +673,8 @@ document.addEventListener("click",async ev=>{
     case "dt-reset": { const st=dtStato(b.dataset.dt); st.q=""; st.seg={}; st.pag=0; render(); break; }
     case "vista": state.vista=v; render(); break;
     case "propaga": dialogPropaga(c); break;
+    case "duplica": dialogDuplica(c); break;
+    case "dup-ok": creaDuplicato(c); break;
     case "cat-nav": { const st=dtStato("cat"); st.seg.k2=""; if(!v) st.seg.k1=""; st.q=""; st.pag=0; render(); break; }
     case "cat-pin": { const pin=DB.catOrd||[]; DB.catOrd=pin.includes(v)?pin.filter(x=>x!==v):[...pin,v]; save(); render(); break; }
     case "forn-add": { const a=art(c), r=await cerca({titolo:"Aggiungi un fornitore",segnaposto:"Cerca il fornitore…",voci:vociFornitori(a.forn.map(f=>f.nome)),nuovo:q=>`Nuovo fornitore «${q}»`}); if(!r) return;
@@ -686,6 +730,7 @@ document.addEventListener("change",async ev=>{
     return salvaCampo(el.dataset.c,patch,`${COMUNE[k]||k} modificato`); }
   if(el.dataset.prezzo&&el.dataset.c){ const a=art(el.dataset.c), k=el.dataset.prezzo, v=el.value===""?null:+el.value;
     if(v!=null&&v<0) return toast("Il prezzo non può essere negativo","warn");
+    if(k==="giorni"&&v!=null&&(v<1||!Number.isInteger(v))) return toast("I giorni devono essere un numero intero da 1 in su","warn");
     return salvaCampo(el.dataset.c,{prezzi:{...a.prezzi,[k]:v}},`prezzo di ${k}: ${v==null?"tolto":"€ "+num(v,2)}`,x=>({prezzi:{...x.prezzi,[k]:v}})); }
   if(el.dataset.tag&&el.dataset.c){ const a=art(el.dataset.c), f=el.dataset.tag, cur=a[f]||[];
     const tog=l=>el.checked?[...new Set([...(l||[]),el.value])]:(l||[]).filter(x=>x!==el.value);
