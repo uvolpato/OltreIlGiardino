@@ -106,6 +106,11 @@ model Articolo {
   profonditaCm     Decimal?       @db.Decimal(8, 1) // P
   altezzaCm        Decimal?       @db.Decimal(8, 1) // H
   diametroCm       Decimal?       @db.Decimal(8, 1) // D
+  // massimi delle misure regolabili o variabili ("h45/72" = altezza da 45 a 72): la logistica usa l'ingombro massimo
+  lunghezzaMaxCm   Decimal?       @db.Decimal(8, 1) // Lx
+  profonditaMaxCm  Decimal?       @db.Decimal(8, 1) // Px
+  altezzaMaxCm     Decimal?       @db.Decimal(8, 1) // Hx
+  diametroMaxCm    Decimal?       @db.Decimal(8, 1) // Dx
   dimensioniTesto  String?        // dim — testo originale del file
   volumeM3         Decimal?       @db.Decimal(8, 3) // vol — da imballato
   pesoKg           Decimal?       @db.Decimal(8, 1) // peso

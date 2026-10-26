@@ -172,3 +172,20 @@ dialog.form.prop{width:min(1080px,94vw)}
 .prop-r:hover{background:var(--sunken)}
 .prop-r input{width:auto; min-height:0; accent-color:var(--accent)}
 @media (max-width:760px){ .prop-g{grid-template-columns:1fr} .prop-l{max-height:34vh} }
+/* tabelle modificabili della scheda e ricerca comune */
+.in-sm,.sel-sm{min-height:30px; padding:3px 8px; font-size:12.5px; width:100%; min-width:70px}
+.link-row{display:inline-flex; align-items:center; gap:6px; border:0; background:none; padding:0; cursor:pointer; color:inherit; font:inherit; text-align:left}
+.link-row:hover strong{color:var(--accent-ink); text-decoration:underline}
+.art-grp .sec-head{margin:0}
+dialog.form.pick{width:min(640px,94vw)}
+.pick .pick-l{max-height:55vh; margin-top:10px}
+.pick .prop-r{width:100%; border:0; background:none; text-align:left; font:inherit}
+.pick .prop-r:focus-visible{outline:2px solid var(--accent)}
+.pick-new{color:var(--accent-ink)}
+/* misure con minimo e massimo; radio e numeri compatti nelle tabelle della scheda */
+.dimgrid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 24px}
+.dimrow{display:grid; grid-template-columns:90px 1fr 1fr; gap:10px; align-items:end}
+.dimrow > span{padding-bottom:10px}
+.art-pane td input[type=radio]{width:18px; height:18px; min-height:0; accent-color:var(--accent)}
+.art-pane td input[type=number].in-sm{width:90px}
+@media (max-width:600px){ .dimgrid{grid-template-columns:1fr} }

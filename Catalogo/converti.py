@@ -1,7 +1,7 @@
 """Converte il file articoli nei dati del prototipo del catalogo.
 Uso:  python Catalogo/converti.py
 
-Legge: Documenti Vari/Articoli_13_10_25_rev2_mod.xlsx
+Legge: Documenti Vari/Articoli IBED_13_10_25_rev2_mod.xlsx
 Scrive: Prototipo-Catalogo/assets/articoli.js  (window.CAT = {articoli, colori, classi, materiali, anomalie})
 """
 import json, re, collections
@@ -9,10 +9,13 @@ from pathlib import Path
 import openpyxl
 
 RADICE = Path(__file__).resolve().parent.parent
-SRC = RADICE / "Documenti Vari" / "Articoli_13_10_25_rev2_mod.xlsx"
+SRC = next((RADICE / "Documenti Vari").glob("Articoli*13_10_25_rev2_mod.xlsx"))   # oggi si chiama "Articoli IBED_13_10_25_rev2_mod.xlsx"
 DEST = RADICE / "Prototipo-Catalogo" / "assets" / "articoli.js"
 SCHEMA = re.compile(r"^([A-Z]{2})([A-Z]{3})(\d{2})(\d{3})-?(\d{2})?$")
-DIM = re.compile(r"(?:(?P<d>[ØøΦ⌀]|diam\.?\s*)\s*(?P<dv>\d+(?:[.,]\d+)?)|(?P<l>\d+(?:[.,]\d+)?)\s*[xX×]\s*(?P<p>\d+(?:[.,]\d+)?))(?:\s*[xX×]?\s*h\s*(?P<h>\d+(?:[.,]\d+)?))?", re.I)
+# "/N" dopo una misura = massimo (h45/72: altezza regolabile da 45 a 72); non lo è se apre un'altra misura ("…h45/80x80xh60")
+N = r"\d+(?:[.,]\d+)?"
+MX = lambda g, fine=True: rf"(?:\s*/\s*(?P<{g}>{N})(?![\d.,]){r'(?!\s*[xX×])' if fine else ''})?"   # fine: l'ultima misura non può aprirne un'altra; (?![\d.,]) evita di accorciare "80" in "8"
+DIM = re.compile(rf"(?:(?P<d>[ØøΦ⌀]|diam\.?\s*)\s*(?P<dv>{N}){MX('dx')}|(?P<l>{N}){MX('lx', False)}\s*[xX×]\s*(?P<p>{N}){MX('px', False)})(?:\s*[xX×]?\s*h\s*(?P<h>{N}){MX('hx')})?", re.I)
 
 wb = openpyxl.load_workbook(SRC, data_only=True)
 
@@ -67,6 +70,8 @@ for r in righe:
         if d.group("dv"): a["D"] = num(d.group("dv"))
         else: a["L"], a["P"] = num(d.group("l")), num(d.group("p"))
         if d.group("h"): a["H"] = num(d.group("h"))
+        for k, g in (("Dx", "dx"), ("Lx", "lx"), ("Px", "px"), ("Hx", "hx")):   # massimo solo se maggiore del minimo
+            if d.group(g) and num(d.group(g)) > (a.get(k[0]) or 0): a[k] = num(d.group(g))
     elif a["dim"]:
         anom["dimensioni"].append(c)
     if cont[c] > 1:

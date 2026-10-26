@@ -793,6 +793,23 @@ dialog.form.prop{width:min(1080px,94vw)}
 .prop-r:hover{background:var(--sunken)}
 .prop-r input{width:auto; min-height:0; accent-color:var(--accent)}
 @media (max-width:760px){ .prop-g{grid-template-columns:1fr} .prop-l{max-height:34vh} }
+/* tabelle modificabili della scheda e ricerca comune */
+.in-sm,.sel-sm{min-height:30px; padding:3px 8px; font-size:12.5px; width:100%; min-width:70px}
+.link-row{display:inline-flex; align-items:center; gap:6px; border:0; background:none; padding:0; cursor:pointer; color:inherit; font:inherit; text-align:left}
+.link-row:hover strong{color:var(--accent-ink); text-decoration:underline}
+.art-grp .sec-head{margin:0}
+dialog.form.pick{width:min(640px,94vw)}
+.pick .pick-l{max-height:55vh; margin-top:10px}
+.pick .prop-r{width:100%; border:0; background:none; text-align:left; font:inherit}
+.pick .prop-r:focus-visible{outline:2px solid var(--accent)}
+.pick-new{color:var(--accent-ink)}
+/* misure con minimo e massimo; radio e numeri compatti nelle tabelle della scheda */
+.dimgrid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 24px}
+.dimrow{display:grid; grid-template-columns:90px 1fr 1fr; gap:10px; align-items:end}
+.dimrow > span{padding-bottom:10px}
+.art-pane td input[type=radio]{width:18px; height:18px; min-height:0; accent-color:var(--accent)}
+.art-pane td input[type=number].in-sm{width:90px}
+@media (max-width:600px){ .dimgrid{grid-template-columns:1fr} }
 </style>
 <script src="assets/articoli.js"></script>
 <!-- listino completo (escluso da git) se presente in locale, altrimenti la copia pubblicabile (Catalogo/pubblica.py) -->
@@ -1044,6 +1061,8 @@ const art=c=>{const a=CAT.articoli.find(x=>x.c===c)||DB.nuovi.find(x=>x.c===c); 
 const setArt=(c,patch,nota)=>{const prev=DB.ov[c]||{}; DB.ov[c]={...prev,...patch,storico:[...(prev.storico||[]),{q:oggi(),chi:RUOLO_N[state.ruolo]||"—",n:nota||Object.keys(patch).join(", ")}]}; save();};
 /* preferenza dell'utente (nel prototipo: del ruolo): raggruppare le varianti di colore per modello */
 const raggruppa=()=>(DB.pref?.[state.ruolo]?.raggruppa)!==false;
+const perCategoria=()=>(DB.pref?.[state.ruolo]?.categorie)!==false;
+const setPref=(k,v)=>{ DB.pref={...DB.pref,[state.ruolo]:{...(DB.pref?.[state.ruolo]||{}),[k]:v}}; save(); };
 const gruppi=()=>{const m=new Map(); ARTICOLI().forEach(a0=>{const a=conOv(a0); if(!m.has(a.b)) m.set(a.b,[]); m.get(a.b).push(a);}); return [...m.values()];};
 
 /* ---------- varianti: campi comuni e propagazione ----------
@@ -1051,10 +1070,12 @@ const gruppi=()=>{const m=new Map(); ARTICOLI().forEach(a0=>{const a=conOv(a0); 
    «comuni» (di solito uguali in tutte le varianti): cambiandone uno si chiede se applicarlo anche alle altre,
    e «Propaga caratteristiche comuni» li copia da un articolo ad altri a scelta.
    Non sono comuni: codice, colore, nome e descrizioni (contengono il colore), foto, colori RGB, giacenza, stato, composizione. */
-const CAMPI_COMUNI=[["k1","Classe"],["k2","Sottoclasse"],["k3","Tipologia"],["tipo","Tipo articolo"],["L","Lunghezza"],["P","Profondità"],["H","Altezza"],["D","Diametro"],
+const CAMPI_COMUNI=[["k1","Classe"],["k2","Sottoclasse"],["k3","Tipologia"],["tipo","Tipo articolo"],["L","Lunghezza"],["Lx","Lunghezza max"],["P","Profondità"],["Px","Profondità max"],["H","Altezza"],["Hx","Altezza max"],["D","Diametro"],["Dx","Diametro max"],
   ["vol","Volume imballato"],["peso","Peso"],["pila","Pezzi per pila"],["pers","Persone per spostarlo"],["tCar","Carico per pezzo"],["tMon","Montaggio per pezzo"],
   ["funz","Funzione"],["stili","Stile"],["temi","Temi"],["attr","Caratteristiche"],["prezzi","Prezzi"],["forn","Fornitori"]];
 const COMUNE=Object.fromEntries(CAMPI_COMUNI);
+/* volume da montato con le misure massime (m³), se il volume da imballato manca */
+const ingombro=a=>{const m=k=>a[k+"x"]||a[k]; return m("L")&&m("P")&&m("H")?m("L")*m("P")*m("H")/1e6:m("D")&&m("H")?Math.PI*(m("D")/2)**2*m("H")/1e6:null;};
 const varianti=c=>{const a=art(c); return a?ARTICOLI().map(conOv).filter(x=>x.b===a.b&&x.c!==c):[];};
 const uguale=(x,y)=>JSON.stringify(x??null)===JSON.stringify(y??null);
 const mostraVal=(k,v)=>v==null||v===""||(Array.isArray(v)&&!v.length)?"—":k==="prezzi"?["acquisto","vendita","noleggio"].map(p=>v[p]!=null?`${p[0].toUpperCase()} € ${num(v[p],2)}`:null).filter(Boolean).join(" · ")||"—"
@@ -1140,6 +1161,50 @@ const sw=(hex,lab="",big=false)=>`<span class="sw${big?" big":""}" style="--sw:$
 /* multi-selezione a checkbox: stesso componente dei ruoli/patenti dell'anagrafica addetti */
 const scelte=(campo,voci,sel=[],c,ro)=>`<div class="chipgroup">${voci.map(x=>`<label class="chk"><input type="checkbox" data-tag="${campo}" data-c="${esc(c)}" value="${esc(x)}"${sel.includes(x)?" checked":""}${ro?" disabled":""}>${esc(x)}</label>`).join("")}</div>`;
 const blocco=(titolo,corpo,{azioni="",aiuto}={})=>`<div class="detail-section">${UI.sezione({titolo,azioni,corpo,aiuto})}</div>`;
+
+/* ---------- ricerca e selezione comune (articoli, fornitori, …) ----------
+   cerca({titolo, voci:[{id,titolo,sotto,sw,gruppo}], gruppi:[[val,etichetta]], nuovo:q=>etichetta|null})
+   → Promise<{id}|{nuovo:q}|null>. Un clic (o Invio sul primo risultato) sceglie e chiude. */
+function cerca({titolo,voci,gruppi=[],nuovo=null,segnaposto="Cerca…"}){
+  return new Promise(res=>{
+    const st={q:"",g:gruppi[0]?.[0]??""}, d=document.createElement("dialog"); d.className="form pick";
+    const trova=()=>{const q=st.q.toLowerCase().trim(); return voci.filter(v=>(!st.g||v.gruppo===st.g)&&(!q||(v.titolo+" "+v.sotto+" "+v.id).toLowerCase().includes(q))).slice(0,60);};
+    const lista=()=>{const r=trova(), n=nuovo&&st.q.trim()&&nuovo(st.q.trim());
+      d.querySelector(".pick-l").innerHTML=r.map(v=>`<button class="prop-r" data-id="${esc(v.id)}">${v.sw?sw(v.sw):""}<span class="grow"><strong>${esc(v.titolo)}</strong> <span class="small muted">${esc(v.sotto||"")}</span></span>${icon("chev",14)}</button>`).join("")
+        +(n?`<button class="prop-r pick-new" data-nuovo="1"><span class="grow"><strong>+ ${esc(n)}</strong></span></button>`:"")
+        +(!r.length&&!n?'<p class="small muted" style="padding:8px">Nessun risultato.</p>':"");
+      d.querySelector(".pick-n").textContent=`${r.length}${r.length===60?"+":""} risultati`;};
+    d.innerHTML=`<div class="dlg-head"><h2 class="grow">${esc(titolo)}</h2></div><div class="dlg-body">
+      <div class="row wrap"><input type="search" class="grow pick-q" placeholder="${esc(segnaposto)}" aria-label="Cerca">${gruppi.length?`<div class="seg seg-sm" role="group">${gruppi.map(([v,l])=>`<button type="button" data-g="${esc(v)}" aria-pressed="${v===st.g}">${esc(l)}</button>`).join("")}</div>`:""}</div>
+      <div class="prop-l pick-l" role="listbox"></div></div>
+      <div class="dlg-foot"><span class="small muted grow pick-n"></span><button class="btn" data-x="1">Annulla</button></div>`;
+    let esito=null;
+    d.addEventListener("click",ev=>{const b=ev.target.closest("button"); if(!b) return;
+      if(b.dataset.g!==undefined){ st.g=b.dataset.g; d.querySelectorAll("[data-g]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.g===st.g)); return lista(); }
+      if(b.dataset.id){ esito={id:b.dataset.id}; closeDlg(d); } if(b.dataset.nuovo){ esito={nuovo:st.q.trim()}; closeDlg(d); } if(b.dataset.x) closeDlg(d); });
+    d.addEventListener("input",ev=>{ st.q=ev.target.value; lista(); });
+    d.addEventListener("keydown",ev=>{ if(ev.key==="Enter"&&ev.target.matches(".pick-q")){ ev.preventDefault(); d.querySelector(".pick-l button")?.click(); } });
+    d.addEventListener("close",()=>{ d.remove(); res(esito); });
+    document.body.append(d); lista(); showDlg(d); d.querySelector(".pick-q").focus();
+  });
+}
+/* sorgenti per la ricerca */
+const vociArticoli=(escludi=[])=>ARTICOLI().map(conOv).filter(x=>!escludi.includes(x.c)).sort((x,y)=>(x.tipo==="componente"?0:1)-(y.tipo==="componente"?0:1)||x.c.localeCompare(y.c))
+  .map(x=>({id:x.c,titolo:x.t||x.d,sotto:`${x.c} · ${cap(x.k2)}`,sw:RGB[x.cc],gruppo:x.tipo}));
+const vociFornitori=(escludi=[])=>{const n={}; ARTICOLI().map(conOv).forEach(x=>(x.forn||[]).forEach(f=>n[f.nome]=(n[f.nome]||0)+1));
+  return Object.entries(n).filter(([k])=>!escludi.includes(k)).sort((a,b)=>a[0].localeCompare(b[0],"it")).map(([k,q])=>({id:k,titolo:k,sotto:`${q} ${q===1?"articolo":"articoli"}`}));};
+/* registra un costo: dialog di inserimento come le anagrafiche */
+function dialogCosto(c){
+  const a=art(c), d=document.createElement("dialog"); d.className="form"; d.id="costoDlg";
+  d.innerHTML=`<div class="dlg-head"><h2 class="grow">Registra un costo · ${esc(a.t||a.d)}</h2></div><div class="dlg-body"><div class="fgrid">
+      ${UI.campo({id:"nk-data",etichetta:"Data",tipo:"date",valore:new Date().toISOString().slice(0,10)})}
+      <div><label class="fl" for="nk-tipo">Tipo</label><select id="nk-tipo"><option value="riacquisto">Riacquisto</option><option value="produzione">Produzione</option></select></div>
+      ${UI.campo({id:"nk-imp",etichetta:"Importo (€)",tipo:"number",attr:'step="0.01" min="0"'})}
+      <div><label class="fl" for="nk-forn">Fornitore</label><select id="nk-forn"><option value="">—</option>${(a.forn||[]).map(f=>`<option${f.principale?" selected":""}>${esc(f.nome)}</option>`).join("")}</select></div>
+      ${UI.campo({id:"nk-nota",etichetta:"Nota",pieno:true})}</div></div>
+    <div class="dlg-foot"><button class="btn" data-act="dlg-close">Annulla</button><button class="btn btn-primary" data-act="costo-add" data-c="${esc(c)}">Registra</button></div>`;
+  document.body.append(d); d.addEventListener("close",()=>d.remove()); showDlg(d); $("nk-imp").focus();
+}
 /* segnaposto foto: le immagini non sono nel progetto, si mostra un riquadro col colore dell'articolo */
 const ph=(a,cls="")=>{const f=a.fotoNuove?.find(x=>x.main)||a.fotoNuove?.[0];
   if(f) return `<div class="ph ${cls} has-img"><img src="${f.pres||f.orig}" alt="${esc(a.t||a.d)}"></div>`;
@@ -1223,12 +1288,13 @@ function navCategorie(tutti,st){
 const briciole=st=>`<nav class="crumbs" aria-label="Percorso"><button class="btn btn-sm btn-ghost" data-act="cat-nav" data-v="">Tutte le categorie</button>${st.seg.k1?` › <button class="btn btn-sm btn-ghost" data-act="cat-nav" data-v="k1">${esc(cap(st.seg.k1))}</button>`:""}${st.seg.k2?` › <strong>${esc(cap(st.seg.k2))}</strong>`:""}${st.q?` · <span class="muted">risultati della ricerca in ${st.seg.k2?"questa sottocategoria":st.seg.k1?"questa categoria":"tutto il catalogo"}</span>`:""}</nav>`;
 function viewCatalogo(){
   const tutti=raggruppa()?gruppi():ARTICOLI().map(a=>[conOv(a)]), unita=raggruppa()?["modello","modelli"]:["articolo","articoli"], list=UI.filtra("cat",tutti,testoGruppo,CAMPI_CAT).sort((a,b)=>a[0].b.localeCompare(b[0].b)), st=dtStato("cat"), cnt=(g,v)=>UI.conta("cat",tutti,testoGruppo,CAMPI_CAT,g,v);
-  const naviga=!st.q&&!st.seg.k2;
+  const naviga=perCategoria()&&!st.q&&!st.seg.k2;
   const filtri=naviga?UI.filtri({id:"cat",cerca:"Cerca in tutto il catalogo: codice, descrizione, fornitore, tema…"}):UI.filtri({id:"cat",cerca:"Cerca codice, descrizione, fornitore, tema…",segmenti:[
       {nome:"st",etichetta:"Stato",voci:[["","Tutti",cnt("st")],...STATI.map(s=>[s,s,cnt("st",s)])]},
+      ...(perCategoria()?[]:[{nome:"k1",etichetta:"Categoria",voci:[["","Tutte"],...ordCat(CLASSI1).map(k=>[k,cap(k),cnt("k1",k)])]}]),
       {nome:"tipo",etichetta:"Tipo",voci:[["","Tutti"],["finito","Articoli finiti",cnt("tipo","finito")],["componente","Componenti",cnt("tipo","componente")]]}]})
     +(naviga?"":`<div class="row wrap colfil" role="group" aria-label="Colore"><span class="tiny muted">Colore</span>${Object.entries(FAMCOL).map(([f,h])=>`<button class="swb${st.seg.col===f?" on":""}" data-act="dt-seg" data-dt="cat" data-g="col" data-v="${st.seg.col===f?"":f}" title="${f}" aria-pressed="${st.seg.col===f}">${sw(h,f)}</button>`).join("")}</div>`);
-  const vista=`<label class="chk"><input type="checkbox" id="pref-raggr"${raggruppa()?" checked":""}>Raggruppa le varianti</label><div class="seg" role="group" aria-label="Vista"><button data-act="vista" data-v="griglia" aria-pressed="${state.vista==="griglia"}">Griglia</button><button data-act="vista" data-v="tabella" aria-pressed="${state.vista==="tabella"}">Tabella</button></div>`;
+  const vista=`<label class="chk"><input type="checkbox" id="pref-cat"${perCategoria()?" checked":""}>Naviga per categoria</label><label class="chk"><input type="checkbox" id="pref-raggr"${raggruppa()?" checked":""}>Raggruppa le varianti</label><div class="seg" role="group" aria-label="Vista"><button data-act="vista" data-v="griglia" aria-pressed="${state.vista==="griglia"}">Griglia</button><button data-act="vista" data-v="tabella" aria-pressed="${state.vista==="tabella"}">Tabella</button></div>`;
   /* la datatable tratta gli array come celle: ogni gruppo va incapsulato in {g} */
   const corpo=naviga?navCategorie(tutti,st):state.vista==="tabella"?UI.datatable({id:"cat",righe:list.map(g=>({g})),perPagina:48,ordIniziale:{key:"b",dir:"asc"},vuoto:"Nessun articolo con questi filtri",suggerimento:"Cambia la ricerca o togli i filtri.",
       riga:({g})=>({act:`data-act="apri" data-c="${esc(g[0].c)}"`}),colonne:[
@@ -1240,7 +1306,7 @@ function viewCatalogo(){
       {key:"st",t:"Stato",tipo:"stato",valore:({g})=>statoArt(g[0])[0],cella:({g})=>UI.stato(...statoArt(g[0]))}]})
     :griglia(list);
   return `<section class="kpis">${UI.kpi(num(ARTICOLI().length,0),"articoli")}${UI.kpi(num(tutti.length,0),"modelli (con varianti)")}${UI.kpi(num(ARTICOLI().filter(a=>compl(conOv(a))===1).length,0),"schede complete",["obiettivo 80%","info"])}${UI.kpi(cnt("st","Da revisionare"),"da revisionare")}</section>
-    ${UI.pannello({titolo:naviga?(st.seg.k1?`${esc(cap(st.seg.k1))}: scegli la sottocategoria`:"Scegli la categoria"):`${num(list.length,0)} ${list.length===1?unita[0]:unita[1]}`,azioni:naviga?`<label class="chk"><input type="checkbox" id="pref-raggr"${raggruppa()?" checked":""}>Raggruppa le varianti</label>`:vista,aiuto:"vista-catalogo",corpo:`<div class="card-body dt-filtri">${briciole(st)}${filtri}</div>${corpo}`})}`;
+    ${UI.pannello({titolo:naviga?(st.seg.k1?`${esc(cap(st.seg.k1))}: scegli la sottocategoria`:"Scegli la categoria"):`${num(list.length,0)} ${list.length===1?unita[0]:unita[1]}`,azioni:naviga?`<label class="chk"><input type="checkbox" id="pref-cat"${perCategoria()?" checked":""}>Naviga per categoria</label><label class="chk"><input type="checkbox" id="pref-raggr"${raggruppa()?" checked":""}>Raggruppa le varianti</label>`:vista,aiuto:"vista-catalogo",corpo:`<div class="card-body dt-filtri">${perCategoria()?briciole(st):""}${filtri}</div>${corpo}`})}`;
 }
 /* griglia a schede: stessa paginazione e stesso piede della datatable (stato in dtStato("cat")) */
 function griglia(list){
@@ -1275,6 +1341,8 @@ function drawerArticolo(){
 
   const usatoIn=ARTICOLI().map(conOv).filter(x=>(x.comp||[]).some(k=>k.cod===c));
   const roP=state.ruolo!=="curatore", disP=roP?" disabled":"";   /* prezzi e fornitori: li modifica il curatore */
+  const testa=(titolo,n,azione)=>`<div class="sec-head"><div class="eyebrow grow">${titolo}${n!=null?` · ${n}`:""}</div>${azione||""}</div>`;
+  const ruoloSel=(k,i)=>`<select class="sel-sm" data-cmp="ruolo" data-c="${esc(c)}" data-i="${i}" aria-label="Ruolo"${dis}>${Object.entries(RUOLI).map(([v,l])=>`<option value="${v}"${k.ruolo===v?" selected":""}>${l}</option>`).join("")}</select>`;
   const eur=v=>v==null||v===""?"—":`€ ${num(v,2)}`;
   /* ---- riepilogo (colonna sinistra) ---- */
   const riep=`<aside class="art-side">${ph(a,"side")}
@@ -1288,7 +1356,7 @@ function drawerArticolo(){
 
   /* ---- contenuto delle schede ---- */
   const pesoComp=(a.comp||[]).reduce((s,k)=>s+((art(k.cod)?.peso||0)*(k.q||1)),0);
-  const volAuto=a.L&&a.P&&a.H?a.L*a.P*a.H/1e6:a.D&&a.H?Math.PI*(a.D/2)**2*a.H/1e6:null;
+  const volAuto=ingombro(a);
   const corpo={
     scheda:()=>`<div class="fgrid">${UI.campo({id:"f-t",etichetta:"Nome",valore:a.t,attr:at("t"),pieno:true})}
         ${UI.campo({id:"f-e",etichetta:"Descrizione",valore:a.e,tipo:"textarea",pieno:true,attr:`rows="5" ${at("e")}`})}
@@ -1302,40 +1370,35 @@ function drawerArticolo(){
     uso:()=>`<div class="art-uso"><div><label class="fl">Funzione</label>${scelte("funz",FUNZIONI,a.funz||[],c,ro)}</div><div><label class="fl">Temi</label>${scelte("temi",TEMI,a.temi||[],c,ro)}</div>
         <div><label class="fl">Stile</label>${scelte("stili",STILI,a.stili||[],c,ro)}</div><div><label class="fl">Caratteristiche</label>${scelte("attr",ATTR,a.attr||[],c,ro)}</div></div>`,
     misure:()=>`<p class="small">Dal file: <span class="mono">${esc(a.dim||"—")}</span></p>
-      <div class="art-grp"><div class="eyebrow">Dimensioni da montato</div><div class="fgrid g4">${f("L","Lunghezza","any","cm")}${f("P","Profondità","any","cm")}${f("H","Altezza","any","cm")}${f("D","Diametro","any","cm")}</div></div>
+      <div class="art-grp"><div class="eyebrow">Dimensioni da montato</div>${UI.nota("Per le misure regolabili o variabili («h45/72» nel file) indica anche il massimo: la logistica usa l'ingombro massimo.")}
+        <div class="dimgrid">${[["L","Lunghezza"],["P","Profondità"],["H","Altezza"],["D","Diametro"]].map(([k,l])=>`<div class="dimrow"><span class="small"><strong>${l}</strong></span>${f(k,"da","any","cm")}${f(k+"x","fino a","any","cm")}</div>`).join("")}</div></div>
       <div class="art-grp"><div class="eyebrow">Trasporto ${UI.hint("sch-misure")}</div><div class="fgrid g4">${f("vol","Volume imballato","0.01","m³")}${f("peso","Peso","0.1","kg")}${f("pila","Pezzi per pila","1")}${f("pers","Persone per spostarlo","1")}</div>
         ${volAuto&&!a.vol&&!ro?`<div class="row" style="margin-top:8px"><span class="small muted grow">Dalle dimensioni: ${num(volAuto,3)} m³ da montato.</span><button class="btn btn-sm" data-act="usa-vol" data-c="${esc(c)}" data-v="${volAuto.toFixed(3)}">Usa come volume</button></div>`:""}</div>
       <div class="art-grp"><div class="eyebrow">Tempi</div><div class="fgrid g4">${f("tCar","Carico per pezzo","0.5","min")}${f("tMon","Montaggio per pezzo","1","min")}</div></div>`,
-    comp:()=>`${UI.tabella({colonne:[{t:"Ruolo"},{t:"Componente"},{t:"Q.tà",num:true},{t:""}],vuoto:"Nessun componente.",righe:(a.comp||[]).map((k,i)=>{const ka=k.cod&&art(k.cod);
-        return [UI.stato(RUOLI[k.ruolo]||k.ruolo,k.ruolo==="rivestimento"?"info":""),ka?`<button class="btn btn-sm btn-ghost" data-act="apri" data-c="${esc(k.cod)}">${esc(ka.d)}</button> <span class="mono tiny muted">${esc(k.cod)}</span>`:esc(k.desc),k.q||1,
-          ro?"":`<button class="icon-btn" data-act="rm-comp" data-c="${esc(c)}" data-i="${i}" aria-label="Togli ${esc(ka?.d||k.desc)}">${icon("x",13)}</button>`];})})}
-      ${ro?"":`<div class="addc"><select id="nc-ruolo" aria-label="Ruolo">${Object.entries(RUOLI).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
-        <input id="nc-desc" placeholder="Descrizione del componente, o cerca un articolo (es. copertura)…" list="nc-list" aria-label="Componente"><datalist id="nc-list">${suggerisciComp(a).map(x=>`<option value="${esc(x.c)} · ${esc(x.d)}">`).join("")}</datalist>
-        <input id="nc-q" type="number" min="1" value="1" style="width:72px" aria-label="Quantità"><button class="btn btn-sm" data-act="add-comp" data-c="${esc(c)}">+ Aggiungi</button></div>`}
-      ${pesoComp?`<p class="small muted">Peso dai componenti: ${num(pesoComp)} kg</p>`:""}
-      ${usatoIn.length?`<p class="small">Usato come componente in: ${usatoIn.map(x=>`<button class="btn btn-sm btn-ghost" data-act="apri" data-c="${esc(x.c)}">${esc(x.d)}</button>`).join(" ")}</p>`:""}`,
+    comp:()=>`<div class="art-grp">${testa("Componenti",(a.comp||[]).length,ro?"":`<button class="btn btn-sm" data-act="comp-add" data-c="${esc(c)}">+ Aggiungi componente</button>`)}
+        ${UI.tabella({colonne:[{t:"Componente"},{t:"Ruolo"},{t:"Q.tà",num:true},{t:"Peso",num:true},{t:""}],vuoto:"Nessun componente: l'articolo è un pezzo unico.",righe:(a.comp||[]).map((k,i)=>{const ka=k.cod&&art(k.cod);
+          return [ka?`<button class="link-row" data-act="apri" data-c="${esc(k.cod)}">${sw(RGB[ka.cc]||"#ddd")} <strong>${esc(ka.t||ka.d)}</strong> <span class="mono tiny muted">${esc(k.cod)}</span></button>`:`${esc(k.desc)} <span class="tiny muted">senza codice</span>`,
+            ruoloSel(k,i),`<input type="number" class="in-sm" min="1" value="${k.q||1}" data-cmp="q" data-c="${esc(c)}" data-i="${i}" aria-label="Quantità"${dis}>`,ka?.peso?`${num(ka.peso*(k.q||1))} kg`:"—",
+            ro?"":`<button class="icon-btn" data-act="rm-comp" data-c="${esc(c)}" data-i="${i}" aria-label="Togli ${esc(ka?.d||k.desc)}">${icon("x",13)}</button>`];})})}
+        ${pesoComp?`<p class="small muted">Peso totale dai componenti: ${num(pesoComp)} kg</p>`:""}</div>
+      <div class="art-grp">${testa("Usato come componente in",usatoIn.length)}
+        ${usatoIn.length?UI.tabella({colonne:[{t:"Articolo"},{t:"Ruolo"}],righe:usatoIn.map(x=>[`<button class="link-row" data-act="apri" data-c="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")} <strong>${esc(x.t||x.d)}</strong> <span class="mono tiny muted">${esc(x.c)}</span></button>`,esc(RUOLI[(x.comp||[]).find(k=>k.cod===c)?.ruolo]||"")])}):`<p class="small muted">${a.tipo==="componente"?"Non ancora collegato: aprilo dall'articolo principale e aggiungilo da «+ Aggiungi componente».":"Nessuno."}</p>`}</div>`,
     foto:()=>`<div class="fotos">${(a.fotoNuove||[]).map((x,i)=>`<figure class="${x.main?"main":""}"><img src="${x.pres||x.orig}" alt=""><figcaption class="tiny">${esc(x.prompt||"originale")}${x.main?" · principale":""}</figcaption>${ro||x.main?"":`<button class="btn btn-sm btn-ghost" data-act="foto-main" data-c="${esc(c)}" data-i="${i}">Rendi principale</button>`}</figure>`).join("")}
         ${(a.foto||[]).map((n,i)=>`<figure><div class="ph sm" style="--ph:${RGB[a.cc]||"#ddd"}"></div><figcaption class="tiny mono">${esc(n)}${i===0?" · principale":""}${fotoFuori(a).includes(n)?' <span class="t-err">· codice diverso</span>':""}</figcaption></figure>`).join("")||(a.fotoNuove?.length?"":'<p class="small muted">Nessuna foto.</p>')}</div>
       ${ro?"":`<div><button class="btn btn-sm" data-act="foto-da" data-c="${esc(c)}">${icon("cam",15)} Aggiungi foto da telefono</button></div>`}
       <div class="art-grp"><div class="eyebrow">Colori rilevati dalla foto</div>${a.rgb?.length?`<div class="row wrap">${a.rgb.map(x=>`${sw(x.hex,"",true)}<span class="mono tiny">${x.hex} · ${x.pct}%</span>`).join("")}</div><p class="tiny muted">Codice colore più vicino: ${vicino(hex2rgb(a.rgb[0].hex))} ${esc(nomeColore(vicino(hex2rgb(a.rgb[0].hex))))}</p>`:'<p class="small muted">Si calcolano quando si aggiunge una foto.</p>'}</div>
       ${UI.nota("Le foto del file sono indicate per nome: la cartella immagini non è ancora nel progetto.")}`,
     prezzi:()=>{ const P=a.prezzi||{}, pf=(k,l)=>UI.campo({id:"p-"+k,etichetta:l+" (€)",valore:P[k]??"",tipo:"number",attr:`data-prezzo="${k}" data-c="${esc(c)}" step="0.01" min="0"${disP}`});
-        const marg=P.vendita&&P.acquisto?Math.round((P.vendita-P.acquisto)/P.vendita*100):null;
-        return `<div class="art-grp"><div class="eyebrow">Prezzi</div><div class="fgrid g4">${pf("acquisto","Acquisto")}${pf("vendita","Vendita")}${pf("noleggio","Noleggio")}</div>
+        const marg=P.vendita&&P.acquisto?Math.round((P.vendita-P.acquisto)/P.vendita*100):null, fin=(k,f,i,attr="")=>`<input class="in-sm" data-fd="${k}" data-c="${esc(c)}" data-i="${i}" value="${esc(f[k]??"")}" ${attr}${disP}>`;
+        return `<div class="art-grp">${testa("Prezzi")}<div class="fgrid g4">${pf("acquisto","Acquisto")}${pf("vendita","Vendita")}${pf("noleggio","Noleggio")}</div>
           ${marg!=null?`<p class="small muted">Margine sulla vendita: ${marg}%${P.noleggio&&P.acquisto?` · il noleggio ripaga l'acquisto in ${Math.ceil(P.acquisto/P.noleggio)} noleggi`:""}</p>`:""}</div>
-        <div class="art-grp"><div class="eyebrow">Fornitori · ${(a.forn||[]).length}</div>
-          ${UI.tabella({colonne:[{t:"Fornitore"},{t:"Codice del fornitore",mono:true},{t:"Prezzo d'acquisto",num:true},{t:"Condizioni"},{t:"Principale"},{t:""}],vuoto:"Nessun fornitore.",righe:(a.forn||[]).map((f,i)=>[
-            `<strong>${esc(f.nome)}</strong>`,esc(f.codice||"—"),eur(f.acquisto),`<span class="small">${esc(f.condizioni||"—")}</span>`,
-            f.principale?UI.stato("principale","ok"):roP?"":`<button class="btn btn-sm btn-ghost" data-act="forn-main" data-c="${esc(c)}" data-i="${i}">Rendi principale</button>`,
-            roP?"":`<button class="icon-btn" data-act="forn-del" data-c="${esc(c)}" data-i="${i}" aria-label="Togli ${esc(f.nome)}">${icon("x",13)}</button>`])})}
-          ${roP?"":`<div class="addc"><input id="nf-nome" placeholder="Fornitore" list="nf-list" aria-label="Fornitore"><datalist id="nf-list">${FORNITORI().map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
-            <input id="nf-cod" placeholder="Suo codice" style="width:130px" aria-label="Codice del fornitore"><input id="nf-pr" type="number" step="0.01" min="0" placeholder="€ acquisto" style="width:110px" aria-label="Prezzo d'acquisto">
-            <input id="nf-cond" placeholder="Condizioni (es. 15 gg, minimo 10 pz)" aria-label="Condizioni"><button class="btn btn-sm" data-act="forn-add" data-c="${esc(c)}">+ Aggiungi</button></div>`}</div>
-        <div class="art-grp"><div class="eyebrow">Storico costi di produzione e di riacquisto · ${(a.costi||[]).length}</div>
-          ${UI.tabella({colonne:[{t:"Data",mono:true},{t:"Tipo"},{t:"Importo",num:true},{t:"Fornitore"},{t:"Nota"}],vuoto:"Nessun costo registrato.",righe:(a.costi||[]).slice().sort((x,y)=>y.data.localeCompare(x.data)).map(k=>[esc(k.data),UI.stato(k.tipo==="produzione"?"Produzione":"Riacquisto",k.tipo==="produzione"?"info":""),eur(k.importo),esc(k.fornitore||"—"),`<span class="small">${esc(k.nota||"")}</span>`])})}
-          ${roP?"":`<div class="addc"><input id="nk-data" type="date" value="${new Date().toISOString().slice(0,10)}" aria-label="Data"><select id="nk-tipo" aria-label="Tipo"><option value="riacquisto">Riacquisto</option><option value="produzione">Produzione</option></select>
-            <input id="nk-imp" type="number" step="0.01" min="0" placeholder="€" style="width:100px" aria-label="Importo"><select id="nk-forn" aria-label="Fornitore"><option value="">—</option>${(a.forn||[]).map(f=>`<option>${esc(f.nome)}</option>`).join("")}</select>
-            <input id="nk-nota" placeholder="Nota" aria-label="Nota"><button class="btn btn-sm" data-act="costo-add" data-c="${esc(c)}">+ Registra</button></div>`}</div>
+        <div class="art-grp">${testa("Fornitori",(a.forn||[]).length,roP?"":`<button class="btn btn-sm" data-act="forn-add" data-c="${esc(c)}">+ Aggiungi fornitore</button>`)}
+          ${UI.tabella({colonne:[{t:"Principale"},{t:"Fornitore"},{t:"Suo codice"},{t:"Prezzo d'acquisto (€)",num:true},{t:"Condizioni"},{t:""}],vuoto:"Nessun fornitore.",righe:(a.forn||[]).map((f,i)=>[
+            `<input type="radio" name="fp-${esc(c)}" data-fp="${i}" data-c="${esc(c)}" aria-label="Fornitore principale: ${esc(f.nome)}"${f.principale?" checked":""}${disP}>`,`<strong>${esc(f.nome)}</strong>`,
+            fin("codice",f,i,'aria-label="Codice del fornitore"'),fin("acquisto",f,i,'type="number" step="0.01" min="0" aria-label="Prezzo d\'acquisto"'),fin("condizioni",f,i,'placeholder="es. 15 gg, minimo 10 pz" aria-label="Condizioni"'),
+            roP?"":`<button class="icon-btn" data-act="forn-del" data-c="${esc(c)}" data-i="${i}" aria-label="Togli ${esc(f.nome)}">${icon("x",13)}</button>`])})}</div>
+        <div class="art-grp">${testa("Storico costi di produzione e di riacquisto",(a.costi||[]).length,roP?"":`<button class="btn btn-sm" data-act="costo-new" data-c="${esc(c)}">+ Registra costo</button>`)}
+          ${UI.tabella({colonne:[{t:"Data"},{t:"Tipo"},{t:"Importo",num:true},{t:"Fornitore"},{t:"Nota"}],vuoto:"Nessun costo registrato.",righe:(a.costi||[]).slice().sort((x,y)=>y.data.localeCompare(x.data)).map(k=>[`<span class="mono">${esc(k.data.split("-").reverse().join("/"))}</span>`,UI.stato(k.tipo==="produzione"?"Produzione":"Riacquisto",k.tipo==="produzione"?"info":""),eur(k.importo),esc(k.fornitore||"—"),`<span class="small">${esc(k.nota||"")}</span>`])})}</div>
         ${a.f==null&&a.pn==null&&!(a.forn||[]).length?UI.nota("Nella versione pubblica fornitori e prezzi del file sono esclusi."):""}`; },
     info:()=>`<div class="art-grp"><div class="eyebrow">Giacenza</div><div class="fgrid g4">${f("giacenza","Giacenza fisica","1","pz")}</div>
         <p class="small muted">${a.giacenzaIl?`Ultimo conteggio: ${esc(a.giacenzaIl)}`:"Mai contata: va allineata articolo per articolo prima del nuovo magazzino."}</p>
@@ -1350,8 +1413,6 @@ function drawerArticolo(){
   fillDrawer(`${a.b} · ${cap(a.k1)} › ${cap(a.k2)}`,a.t||a.d,`<div class="art">${riep}<section class="art-main">${schede}<div class="art-pane">${corpo[tab]()}</div></section></div>`,foot);
 }
 const FORNITORI=()=>[...new Set(ARTICOLI().map(conOv).flatMap(x=>(x.forn||[]).map(f=>f.nome)))].sort();
-const suggerisciComp=a=>{const parola=(a.t||a.d).split(/\s+/).find(w=>w.length>3&&!/poltrona|divano|pouf|tavolo|sedia/i.test(w))||"";
-  return ARTICOLI().map(conOv).filter(x=>x.b!==a.b&&(x.tipo==="componente"||/piano|gamba|telo|zavorr|cuscin/i.test(x.d))&&(!parola||x.d.toLowerCase().includes(parola.toLowerCase())||x.k1===a.k1)).slice(0,40);};
 
 /* ---------- AI simulata ---------- */
 const KW=[[/pallet|legno|rustic|botte|cassett/i,"Rustico"],[/ferro|metall|industr|acciaio|corten/i,"Industrial"],[/velluto|oro|ottone|crist|specchi/i,"Luxury"],[/bamb|rattan|vimini|midollino|juta|paglia/i,"Boho"],[/tropic|palm|jungle|mare|righe/i,"Tropicale"],[/vintage|retr|anni/i,"Vintage"],[/bianc|minimal|plexi|metacril/i,"Minimal"],[/shabby|provenz|decap/i,"Shabby chic"]];
@@ -1540,7 +1601,7 @@ function viewImport(){
 /* ---------- API ---------- */
 function viewApi(){
   const a=art(state.sel||"SEPOU83006-11")||CAT.articoli[0], ex={codice:a.c,modello:a.b,nome:a.t||a.d,descrizione:a.e,classificazione:[a.k1,a.k2,a.k3],colore:{codice:a.cc,nome:nomeColore(a.cc),rgb:a.rgb||[]},materiale:a.mat?{codice:a.mat,nome:nomeMateriale(a.mat)}:null,
-    tipo:a.tipo,dimensioni_cm:{L:a.L,P:a.P,H:a.H,D:a.D},logistica:{volume_m3:a.vol??(a.L&&a.P&&a.H?+(a.L*a.P*a.H/1e6).toFixed(3):null),volume_stimato:!a.vol,peso_kg:a.peso??null,pezzi_per_pila:a.pila??null,persone:a.pers??null},prezzi:a.prezzi,fornitori:(a.forn||[]).map(f=>({nome:f.nome,codice:f.codice||null,principale:!!f.principale})),giacenza_fisica:a.giacenza??null,funzione:a.funz||[],stili:a.stili||[],temi:a.temi||[],componenti:a.comp||[],
+    tipo:a.tipo,dimensioni_cm:{L:a.L,L_max:a.Lx??null,P:a.P,P_max:a.Px??null,H:a.H,H_max:a.Hx??null,D:a.D,D_max:a.Dx??null},logistica:{volume_m3:a.vol??(ingombro(a)?+ingombro(a).toFixed(3):null),volume_stimato:!a.vol,peso_kg:a.peso??null,pezzi_per_pila:a.pila??null,persone:a.pers??null},prezzi:a.prezzi,fornitori:(a.forn||[]).map(f=>({nome:f.nome,codice:f.codice||null,principale:!!f.principale})),giacenza_fisica:a.giacenza??null,funzione:a.funz||[],stili:a.stili||[],temi:a.temi||[],componenti:a.comp||[],
     varianti:(gruppi().find(g=>g.some(x=>x.c===a.c))||[]).map(x=>x.c),foto:(a.foto||[]).map(f=>"https://…/foto/"+f),stato:statoArt(a)[0]};
   return `<div class="ptwo">${UI.pannello({titolo:"API REST (sola lettura)",aiuto:"vista-api",corpo:UI.tabella({colonne:[{t:"Metodo"},{t:"Percorso",mono:true},{t:"Cosa restituisce"}],righe:[
       ["GET","/articoli","elenco con filtri: testo, classe, funzione, stile, tema, colore vicino a un RGB, stato, aggiornati dopo il…"],["GET","/articoli/{codice}","scheda completa con varianti, componenti, foto, misure"],
@@ -1569,14 +1630,17 @@ document.addEventListener("click",async ev=>{
     case "propaga": dialogPropaga(c); break;
     case "cat-nav": { const st=dtStato("cat"); st.seg.k2=""; if(!v) st.seg.k1=""; st.q=""; st.pag=0; render(); break; }
     case "cat-pin": { const pin=DB.catOrd||[]; DB.catOrd=pin.includes(v)?pin.filter(x=>x!==v):[...pin,v]; save(); render(); break; }
-    case "forn-add": { const n=$("nf-nome").value.trim(); if(!n) return toast("Scrivi il nome del fornitore","warn"); const a=art(c);
-      if(a.forn.some(f=>f.nome.toLowerCase()===n.toLowerCase())) return toast("Questo fornitore c'è già","warn");
-      setArt(c,{forn:[...a.forn,{nome:n,codice:$("nf-cod").value.trim(),acquisto:$("nf-pr").value===""?null:+$("nf-pr").value,condizioni:$("nf-cond").value.trim(),principale:!a.forn.length}]},`fornitore aggiunto: ${n}`); dopo("Fornitore aggiunto"); break; }
-    case "forn-main": { const a=art(c); setArt(c,{forn:a.forn.map((f,i)=>({...f,principale:i===+b.dataset.i}))},"fornitore principale"); dopo("Fornitore principale aggiornato"); break; }
+    case "forn-add": { const a=art(c), r=await cerca({titolo:"Aggiungi un fornitore",segnaposto:"Cerca il fornitore…",voci:vociFornitori(a.forn.map(f=>f.nome)),nuovo:q=>`Nuovo fornitore «${q}»`}); if(!r) return;
+      const n=r.id||r.nuovo; setArt(c,{forn:[...a.forn,{nome:n,codice:"",acquisto:null,condizioni:"",principale:!a.forn.length}]},`fornitore aggiunto: ${n}`); dopo(`${n} aggiunto: completa codice, prezzo e condizioni`); break; }
+    case "comp-add": { const a=art(c), r=await cerca({titolo:"Aggiungi un componente",segnaposto:"Cerca per nome o codice (es. copertura, anima)…",
+        voci:vociArticoli([c,...(a.comp||[]).map(k=>k.cod).filter(Boolean)]),gruppi:[["componente","Componenti"],["","Tutti gli articoli"]],nuovo:q=>`Componente senza codice «${q}»`}); if(!r) return;
+      const ka=r.id&&art(r.id), ruolo=ka&&/copertur|fodera|rivestiment/i.test(ka.d)?"rivestimento":ka&&/anima|imbottit/i.test(ka.d)?"anima":ka&&/struttur/i.test(ka.d)?"struttura":"parte";
+      setArt(c,{comp:[...(a.comp||[]),{ruolo,q:1,...(r.id?{cod:r.id}:{desc:r.nuovo})}]},"componente aggiunto"); dopo(`Componente aggiunto come «${RUOLI[ruolo]}»: cambia ruolo e quantità nella tabella`); break; }
+    case "costo-new": dialogCosto(c); break;
     case "forn-del": { const a=art(c), f=a.forn[+b.dataset.i]; if(!await UI.conferma({titolo:"Togliere il fornitore?",testo:`«${f.nome}» non sarà più tra i fornitori di questo articolo.`,ok:"Togli",pericolo:true})) return;
       const resto=a.forn.filter((_,i)=>i!==+b.dataset.i); if(f.principale&&resto[0]) resto[0]={...resto[0],principale:true}; setArt(c,{forn:resto},`fornitore tolto: ${f.nome}`); dopo("Fornitore tolto"); break; }
-    case "costo-add": { const imp=$("nk-imp").value; if(imp===""||!$("nk-data").value) return toast("Data e importo sono obbligatori","warn"); const a=art(c);
-      setArt(c,{costi:[...a.costi,{data:$("nk-data").value,tipo:$("nk-tipo").value,importo:+imp,fornitore:$("nk-forn").value,nota:$("nk-nota").value.trim()}]},"costo registrato"); dopo("Costo registrato"); break; }
+    case "costo-add": { const imp=$("nk-imp").value; if(imp===""||!$("nk-data").value) return toast("Data e importo sono obbligatori","warn"); if(+imp<0) return toast("L'importo non può essere negativo","warn"); const a=art(c);
+      setArt(c,{costi:[...a.costi,{data:$("nk-data").value,tipo:$("nk-tipo").value,importo:+imp,fornitore:$("nk-forn").value,nota:$("nk-nota").value.trim()}]},"costo registrato"); closeDlg($("costoDlg")); dopo("Costo registrato"); break; }
     case "giac-ok": setArt(c,{giacenzaIl:oggi()},"conteggio confermato"); dopo("Conteggio confermato"); break;
     case "apri": apri(c); break;
     case "close-drawer": closeDrawer(); break;
@@ -1587,8 +1651,6 @@ document.addEventListener("click",async ev=>{
     case "scarta": { const a=art(c); if(!await UI.conferma({titolo:"Rimandare la scheda?",testo:`«${a.t||a.d}» torna al censitore e esce dalla coda di revisione.`,ok:"Rimanda"})) return;
       setArt(c,{stato:""},"rimandato al censitore"); dopo("Scheda rimandata al censitore"); break; }
     case "usa-vol": setArt(c,{vol:+v},"volume dalle dimensioni"); dopo("Volume aggiornato"); break;
-    case "add-comp": { const d=$("nc-desc").value.trim(); if(!d) return toast("Scrivi la descrizione o scegli un articolo","warn");
-      const cod=d.split(" · ")[0], ka=art(cod), a=art(c); setArt(c,{comp:[...(a.comp||[]),{ruolo:$("nc-ruolo").value,q:+$("nc-q").value||1,...(ka?{cod}:{desc:d})}]},"componente aggiunto"); dopo("Componente aggiunto"); break; }
     case "rm-comp": { const a=art(c), k=a.comp[+b.dataset.i]; if(!await UI.conferma({titolo:"Togliere il componente?",testo:`«${art(k.cod)?.d||k.desc}» viene tolto dalla composizione.`,ok:"Togli",pericolo:true})) return;
       setArt(c,{comp:a.comp.filter((_,i)=>i!==+b.dataset.i)},"componente tolto"); dopo("Componente tolto"); break; }
     case "foto-main": { const a=art(c); setArt(c,{fotoNuove:a.fotoNuove.map((x,i)=>({...x,main:i===+b.dataset.i}))},"foto principale"); dopo("Foto principale aggiornata"); break; }
@@ -1625,7 +1687,13 @@ document.addEventListener("change",async ev=>{
   if(el.dataset.tag&&el.dataset.c){ const a=art(el.dataset.c), f=el.dataset.tag, cur=a[f]||[];
     const tog=l=>el.checked?[...new Set([...(l||[]),el.value])]:(l||[]).filter(x=>x!==el.value);
     return salvaCampo(el.dataset.c,{[f]:tog(cur)},`${COMUNE[f]}: ${el.checked?"+":"−"} ${el.value}`,x=>({[f]:tog(x[f])})); }
-  if(el.id==="pref-raggr"){ DB.pref={...DB.pref,[state.ruolo]:{...(DB.pref?.[state.ruolo]||{}),raggruppa:el.checked}}; save(); dtStato("cat").pag=0; render(); }
+  if(el.dataset.cmp&&el.dataset.c){ const a=art(el.dataset.c), i=+el.dataset.i, v=el.dataset.cmp==="q"?Math.max(1,+el.value||1):el.value;
+    setArt(el.dataset.c,{comp:a.comp.map((k,j)=>j===i?{...k,[el.dataset.cmp]:v}:k)},`componente: ${el.dataset.cmp==="q"?"quantità":"ruolo"}`); dopo("Componente aggiornato"); }
+  if(el.dataset.fd&&el.dataset.c){ const a=art(el.dataset.c), i=+el.dataset.i, k=el.dataset.fd, v=k==="acquisto"?(el.value===""?null:+el.value):el.value.trim();
+    if(k==="acquisto"&&v!=null&&v<0) return toast("Il prezzo non può essere negativo","warn");
+    setArt(el.dataset.c,{forn:a.forn.map((f,j)=>j===i?{...f,[k]:v}:f)},`fornitore ${a.forn[i].nome}: ${k}`); dopo("Fornitore aggiornato"); }
+  if(el.dataset.fp&&el.dataset.c){ const a=art(el.dataset.c); setArt(el.dataset.c,{forn:a.forn.map((f,i)=>({...f,principale:i===+el.dataset.fp}))},"fornitore principale"); dopo("Fornitore principale aggiornato"); }
+  if(el.id==="pref-raggr"||el.id==="pref-cat"){ setPref(el.id==="pref-cat"?"categorie":"raggruppa",el.checked); const st=dtStato("cat"); st.pag=0; if(el.id==="pref-cat") st.seg.k2=""; render(); }
   if(el.id==="np-base") $("np-t").value=PROMPT_STD[+el.value].t;
   if(el.id==="m-file"&&el.files.length){ m.foto=[...(m.foto||[]),...await Promise.all([...el.files].map(leggiFile))]; rm(); }
   if(el.dataset.mp){ m.pid=+el.value; m.ptesto=null; rm(); }
