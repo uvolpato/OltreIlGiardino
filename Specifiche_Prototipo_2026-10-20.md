@@ -491,6 +491,9 @@ PDF Offerte/*.pdf
 | `Prototipo-Catalogo/index.html` | prototipo del catalogo, generato da `Catalogo/build.py` |
 | `Prototipo-Catalogo/assets/articoli.js`, `articoli-demo.js` | listino completo (escluso da git) e copia pubblicabile (`Catalogo/pubblica.py`) |
 | `Guida_Prototipo.md` | guida d'uso del prototipo e casi dimostrativi |
+| `Guida_Catalogo.md` | guida d'uso del prototipo Catalogo |
+
+Ogni prototipo ha nella barra laterale il link alla sua guida, pubblicata come pagina HTML da GitHub Pages.
 | `Preventivo_Pianificatore_Catalogo.md` | preventivo delle due applicazioni, mercato e Patent Box |
 | `Estrazione/schema_offerta.json`, `prompt_e_config.md` | schema e prompt di estrazione |
 | `Estrazione/estrai.py`, `converti.py` | pipeline di estrazione e conversione |

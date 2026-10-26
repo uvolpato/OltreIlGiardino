@@ -43,7 +43,8 @@ const LS="serra-catalogo-v1";   // chiave storica: cambiarla farebbe perdere i d
 const load=()=>{try{return JSON.parse(localStorage.getItem(LS))||{};}catch{return {};}};
 const DB=Object.assign({ov:{},nuovi:[],prompt:[]},load());
 const save=()=>{try{localStorage.setItem(LS,JSON.stringify(DB));}catch{}};
-const state={view:"catalogo",ruolo:DB.ruolo||null,dt:{},sel:null,mob:{step:0},vista:"griglia",drawer:null};
+const state={view:"catalogo",ruolo:null,  // si parte sempre dalla scelta del profilo
+  dt:{},sel:null,mob:{step:0},vista:"griglia",drawer:null};
 
 /* articoli: dati origine + modifiche locali + nuovi censiti */
 const ARTICOLI=()=>[...CAT.articoli,...DB.nuovi];
@@ -661,8 +662,8 @@ const dopo=(msg,kind="")=>{ render(); if(msg) toast(msg,kind); };
 document.addEventListener("click",async ev=>{
   const b=ev.target.closest("[data-act]"); if(!b) return; const v=b.dataset.v, c=b.dataset.c, m=M();
   switch(b.dataset.act){
-    case "ruolo": state.ruolo=DB.ruolo=v; save(); state.view=VISIBILI[v][0]; render(); break;
-    case "esci": state.ruolo=null; DB.ruolo=null; save(); closeDrawer(); render(); break;
+    case "ruolo": state.ruolo=v; state.view=VISIBILI[v][0]; render(); break;
+    case "esci": state.ruolo=null; closeDrawer(); render(); break;
     case "reset": if(await UI.conferma({titolo:"Azzerare le modifiche?",testo:"Si torna ai dati originali: articoli censiti, foto e modifiche fatte in questo browser vanno persi.",ok:"Azzera",pericolo:true})){ try{localStorage.removeItem(LS);}catch{} location.reload(); } break;
     case "view": state.view=v; closeDrawer(); if(v==="censimento"&&m.step===5) state.mob={step:0}; render(); $("view").scrollTop=0; break;
     case "tab": state[b.dataset.k]=v; render(); break;

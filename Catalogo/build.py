@@ -57,8 +57,8 @@ html = f"""<!doctype html>
     </div>
     <nav class="nav" id="nav" aria-label="Sezioni"></nav>
     <div class="health" id="health" aria-live="polite"></div>
-    <!-- guide: le pagine .md pubblicate da GitHub Pages (Jekyll le rende HTML); funziona anche aprendo il file da disco, con internet -->
-    <details class="side-docs"><summary>Guide e specifiche</summary><ul><li><a href="https://uvolpato.github.io/OltreIlGiardino/PRD_Catalogo_Prodotti.html" target="_blank" rel="noopener">PRD Catalogo prodotti</a></li><li><a href="https://uvolpato.github.io/OltreIlGiardino/Catalogo/AUDIT_Anagrafica_Articoli.html" target="_blank" rel="noopener">Audit anagrafica articoli</a></li><li><a href="https://uvolpato.github.io/OltreIlGiardino/Guida_Prototipo.html" target="_blank" rel="noopener">Guida al prototipo Logistica</a></li><li><a href="https://uvolpato.github.io/OltreIlGiardino/Documentazione_UI.html" target="_blank" rel="noopener">Documentazione interfaccia</a></li></ul></details>
+    <!-- guida: la pagina .md pubblicata da GitHub Pages (Jekyll la rende HTML) -->
+    <a class="side-docs" href="https://uvolpato.github.io/OltreIlGiardino/Guida_Catalogo.html" target="_blank" rel="noopener">Guida al prototipo</a>
     <p class="side-foot" id="sideFoot"></p>
   </aside>
   <div class="main">
