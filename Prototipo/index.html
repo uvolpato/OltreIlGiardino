@@ -242,6 +242,12 @@ body.panning .gscroll, body.panning .gscroll *{cursor:grabbing !important; user-
 .alert{display:grid; grid-template-columns:auto 1fr; gap:4px 10px; padding:12px 16px; border:0; border-bottom:1px solid var(--border); background:none; text-align:left; cursor:pointer; transition:background 120ms}
 .alert:hover{background:var(--hover)}
 .alert:last-child{border-bottom:0}
+.alert.prom{cursor:default}
+.alert.prom.done .a-t{text-decoration:line-through; color:var(--muted)}
+.pmark{position:absolute; top:50%; width:13px; height:13px; margin:-7px 0 0 -7px; padding:0; transform:rotate(45deg); border:2px solid var(--surface); border-radius:3px; background:var(--info); cursor:pointer; z-index:3}
+.pmark.err{background:var(--danger)} .pmark.warn{background:var(--warn)} .pmark.ok{background:var(--faint)}
+.pmark:hover,.pmark:focus-visible{outline:2px solid var(--fg); outline-offset:1px}
+.chip.err{background:var(--danger); color:#fff}
 .alert .dot{margin-top:6px}
 .alert .a-t{font-size:13px; font-weight:600}
 .alert .a-d{grid-column:2; font-size:12px; color:var(--muted)}
@@ -919,6 +925,9 @@ const ART=Object.fromEntries(ARTICOLI.map(a=>[a.cod,a]));
 const RUOLI=["Autista","Capo squadra","Montatore","Magazziniere","Falegname","Officina"];
 const PATENTI=["B","C","CE"];
 const CERTIFICAZIONI=["Muletto","Carrello","RSPP"];
+/* documenti dell'addetto con scadenza (scheda Documenti): uno stesso tipo può ripetersi */
+const DOC_TIPI=["Carta d'identità","Permesso di soggiorno","Patente di guida","CQC merci","Carta tachigrafica","Idoneità sanitaria (visita medica)",
+  "Formazione sicurezza (D.Lgs. 81/08)","Abilitazione carrelli elevatori","Abilitazione PLE","Lavori in quota / DPI 3ª cat.","Primo soccorso","Antincendio","Preposto","Altro"];
 /* tipi di fermo mezzo (lo stato Libero/fermo si calcola dai fermi) */
 const STATI_MEZZI=["Manutenzione","Revisione","Tagliando","Guasto","Noleggiato a terzi"];
 const LOOKUP={ruoli:RUOLI,patenti:PATENTI,certificazioni:CERTIFICAZIONI,statiMezzi:STATI_MEZZI};
@@ -926,8 +935,10 @@ const LOOKUP={ruoli:RUOLI,patenti:PATENTI,certificazioni:CERTIFICAZIONI,statiMez
 const RUOLO_TASK={Magazziniere:["CARICO","RIENTRO","RICONSEGNA"],Autista:["VIAGGIO","CONSEGNA","RITIRO","RIENTRO_SQ"],Montatore:["ALLESTIMENTO","DISALLESTIMENTO"],Falegname:["FALEGNAMERIA"],Officina:["OFFICINA"]};
 
 const ADDETTI=[
-  {nome:"Luigi Rossi",ruoli:["Autista","Magazziniere"],tipo:"interno",coop:"",patenti:["B","C","CE"],cert:["Muletto"],turno:"06:00",orario:"full-time",maxOreSettimana:40,assenze:[],valutazione:4,note:"",incompatibilita:[]},
-  {nome:"Paolo Riva",ruoli:["Autista"],tipo:"interno",coop:"",patenti:["B","C"],cert:[],turno:"06:00",orario:"full-time",maxOreSettimana:40,assenze:[{tipo:"Riposo",da:"2026-10-22",a:"2026-10-22"}],valutazione:4,note:"",incompatibilita:[]},
+  {nome:"Luigi Rossi",ruoli:["Autista","Magazziniere"],tipo:"interno",coop:"",patenti:["B","C","CE"],cert:["Muletto"],turno:"06:00",orario:"full-time",maxOreSettimana:40,assenze:[],valutazione:4,note:"",incompatibilita:[],
+    docs:[{tipo:"Patente di guida",num:"CE",scadenza:"2029-03-15"},{tipo:"CQC merci",num:"",scadenza:"2026-11-12"},{tipo:"Abilitazione carrelli elevatori",num:"",scadenza:"2028-06-30"}]},
+  {nome:"Paolo Riva",ruoli:["Autista"],tipo:"interno",coop:"",patenti:["B","C"],cert:[],turno:"06:00",orario:"full-time",maxOreSettimana:40,assenze:[{tipo:"Riposo",da:"2026-10-22",a:"2026-10-22"}],valutazione:4,note:"",incompatibilita:[],
+    docs:[{tipo:"Idoneità sanitaria (visita medica)",num:"",scadenza:"2026-10-15"},{tipo:"Carta tachigrafica",num:"",scadenza:"2027-09-01"}]},
   {nome:"Sara Conti",ruoli:["Capo squadra","Montatore"],tipo:"interno",coop:"",patenti:["B"],cert:["RSPP"],turno:"07:00",orario:"part-time 50%",maxOreSettimana:20,assenze:[{tipo:"Riposo",da:"2026-10-25",a:"2026-10-25"}],valutazione:5,note:"",incompatibilita:[]},
   {nome:"Marco Bianchi",ruoli:["Montatore"],tipo:"interno",coop:"",patenti:["B"],cert:[],turno:"07:00",orario:"full-time",maxOreSettimana:40,assenze:[],valutazione:3,note:"",incompatibilita:["Elena Greco"]},
   {nome:"Elena Greco",ruoli:["Montatore"],tipo:"interno",coop:"",patenti:["B"],cert:[],turno:"07:00",orario:"full-time",maxOreSettimana:40,assenze:[],valutazione:4,note:"",incompatibilita:["Marco Bianchi"]},
@@ -958,7 +969,13 @@ const TRASPORTATORI=[
   {nome:"Trasporti Bianchi",tipo:"corriere",mezzi:[{nome:"Furgone medio",tipo:"Furgone",patente:"B",portata:1200,massa:3.5,lung:5.5,euro:6},{nome:"Bilico",tipo:"Bilico",patente:"CE",portata:24000,massa:18,lung:16.5,euro:5}],tariffa:{modello:"forfait",costoKm:null,costoOra:null,forfait:320},affidabilita:4,note:"Preavviso 48 h"},
   {nome:"Noleggi Rapidi SRL",tipo:"noleggio",mezzi:[{nome:"Furgone cassonato",tipo:"Furgone",patente:"B",portata:1500,massa:3.5,lung:6,euro:6},{nome:"Daily 7,5t",tipo:"Iveco",patente:"C",portata:3500,massa:7.5,lung:7.5,euro:6}],tariffa:{modello:"km",costoKm:2.4,costoOra:null,forfait:null},affidabilita:3,note:"Disponibile in giornata"}
 ];
-let RAPPORTINI=[];
+/* cooperative: tariffe orarie per il consuntivo. Straordinario e festivo sostituiscono l'ordinaria, il notturno (22–6) si somma */
+const COOPERATIVE=[
+  {nome:"Konnekta",tariffe:{ord:21.5,stra:25,notte:4,fest:29,trasf:40},soglia:8,note:"Tariffe di esempio"},
+  {nome:"Coop Edile Nord",tariffe:{ord:23,stra:27.5,notte:5,fest:31,trasf:45},soglia:8,note:"Tariffe di esempio"},
+  {nome:"Trasporti Esterni BG",tariffe:{ord:24,stra:28,notte:5,fest:32,trasf:50},soglia:8,note:"Tariffe di esempio"}];
+/* cartellini importati: una riga per persona e giorno {nominativo, area, persona (addetto abbinato), data, turni:[[e,u]], commento, totFile (min), file} */
+let CARTELLINI=[];
 const PAT={B:1,C:2,CE:3};
 const canDrive=(a,m)=>a.patenti.some(p=>(PAT[p]??1)>=(PAT[m.patente]??1));
 /* un addetto è adatto a un micro-task se uno dei suoi ruoli lo copre (Capo squadra va bene ovunque) */
@@ -1080,7 +1097,7 @@ function generaTasks(o){
   return T;
 }
 
-const state={gtab:"uscite","cmp-tab":"a",sort:"inizio",view:"giornata",date:TODAY,zoom:"settimana",step:"settimana",pxh:{giorno:64,settimana:4,mese:1.5},mode:"ordine",expanded:new Set(),rtab:"addetti",ntab:"alert",inviati:new Set(),dt:{},ordini:[],av:null,drawer:null};
+const state={gtab:"uscite","cmp-tab":"a",sort:"inizio",view:"giornata",date:TODAY,zoom:"settimana",step:"settimana",pxh:{giorno:64,settimana:4,mese:1.5},mode:"ordine",expanded:new Set(),rtab:"addetti",ntab:"alert",dt:{},ordini:[],av:null,drawer:null};
 
 function nuovoOrdine(seed,id){
   const o={...seed,id};
@@ -1098,7 +1115,8 @@ const legTasks=(o,leg)=>o.tasks.filter(t=>t.leg===leg).sort((a,b)=>a.inizio-b.in
 /* il mezzo dell'andata serve anche al carico */
 const legMezzoTasks=(o,leg)=>o.tasks.filter(t=>TIPI[t.tipo].mezzo && (leg==="B"?t.leg==="B":t.leg!=="B"));
 const legMezzi=(o,leg)=>legMezzoTasks(o,leg).find(t=>t.mezzi.length)?.mezzi||[];
-const legMezzo=(o,leg)=>legMezzi(o,leg).join(" + ")||null;
+const legEsterno=(o,leg)=>legMezzoTasks(o,leg).find(t=>t.esterno)?.esterno||null;  // trasportatore esterno affidato: {nome,costo}
+const legMezzo=(o,leg)=>legMezzi(o,leg).join(" + ")||legEsterno(o,leg)?.nome||null;
 const span=ts=>[new Date(Math.min(...ts.map(t=>t.inizio))),new Date(Math.max(...ts.map(t=>t.fine)))];
 
 function fermo(m,s,e){ return assenza({assenze:m?.fermi},s,e); }
@@ -1216,11 +1234,14 @@ function calcolaAvvisi(){
       if(!n) push({sev:"media",cat:"Assegnazione",titolo:`${LEG[leg]} senza squadra`,dettaglio:`${o.cliente} · ${rng(ts[0])}`,azione:"Usa «Proponi risorse» sull'ordine o assegna dal dettaglio."},o,leg);
       else if(n<need) push({sev:"bassa",cat:"Assegnazione",titolo:`${LEG[leg]}: squadra ridotta (${n} di ${need})`,dettaglio:`${o.cliente} · ${num(e.volume)} m³ da movimentare`,azione:"Aggiungi un addetto o accetta tempi più lunghi."},o,leg);
       ts[0].risorse.forEach(r=>{const x=ADD[r]&&assenza(ADD[r],s,f); if(x){ ts.forEach(t=>conflitti.add(t.id));
-        push({sev:"alta",cat:"Assenza",titolo:`${r} è assegnato ma in ${x.tipo.toLowerCase()}`,dettaglio:`${o.cliente} · ${LEG[leg].toLowerCase()} ${rng(ts[0])}`,azione:"Sostituisci l'addetto dal dettaglio dell'incarico."},o,leg);}});
+        push({sev:"alta",cat:"Assenza",titolo:`${r} è assegnato ma in ${x.tipo.toLowerCase()}`,dettaglio:`${o.cliente} · ${LEG[leg].toLowerCase()} ${rng(ts[0])}`,azione:"Sostituisci l'addetto dal dettaglio dell'incarico."},o,leg);}
+        const dx=(ADD[r]?.docs||[]).filter(d=>d.scadenza&&new Date(d.scadenza+"T23:59")<f); if(dx.length){ ts.forEach(t=>conflitti.add(t.id));
+        push({sev:"alta",cat:"Documenti",titolo:`${r}: ${dx.map(d=>d.tipo).join(", ")} scadut${dx.length>1?"i":"o"} alla data dell'incarico`,dettaglio:`${o.cliente} · ${LEG[leg].toLowerCase()} ${rng(ts[0])}`,azione:"Rinnova il documento o sostituisci l'addetto."},o,leg);}});
       const nomi=ts[0].risorse; for(let i=0;i<nomi.length;i++) for(let j=i+1;j<nomi.length;j++){ const a=ADD[nomi[i]], b=ADD[nomi[j]]; if(a&&b&&(a.incompatibilita.includes(b.nome)||b.incompatibilita.includes(a.nome))){ ts.forEach(t=>conflitti.add(t.id)); push({sev:"alta",cat:"Squadra",titolo:`Incompatibilità in squadra`,dettaglio:`${o.cliente}: ${a.nome} e ${b.nome} non possono stare insieme`,azione:"Rimuovi uno dei due addetti dalla tratta."},o,leg); break;} }
       if(leg==="C"||leg==="R") return;
       const ms=legMezzi(o,leg).map(n=>MZ[n]);
       if(!ms.length){
+        if(legEsterno(o,leg)) return;  // ponytail: trasporto affidato all'esterno, nessun controllo su patenti/ZTL del loro mezzo
         const alt=flotta(o,s,f,null).length?"Scegli il mezzo dal dettaglio della tratta.":"Tutti i mezzi interni sono impegnati o in manutenzione.";
         const eco=stimaTrasportatori(o,leg).sort((a,b)=>a.costo-b.costo)[0];
         push({sev:"media",cat:"Mezzo",titolo:`${LEG[leg]} senza mezzo — ${o.numero}`,dettaglio:`${o.cliente}. ${alt}`,azione:`Valuta ${eco?`${eco.nome} da €${num(eco.costo)}`:CORRIERE.nome+" (preavviso "+CORRIERE.lead+" h, circa €"+CORRIERE.costo+")"} o due viaggi.`},o,leg);
@@ -1244,6 +1265,14 @@ function calcolaAvvisi(){
   });
   turni(list);
   oreMax(list);
+  ADDETTI.forEach(a=>docProblemi(a).forEach(([d,[t,,l]])=>list.push({sev:l>1?"alta":"media",cat:"Documenti",titolo:`${a.nome}: ${d.tipo} ${l>1?"scaduto":"in scadenza"}`,
+    dettaglio:`${t}${d.num?" · "+d.num:""} (scadenza ${dm(new Date(d.scadenza+"T00:00"))})`,azione:"Aggiorna la data nella scheda addetto, tab Documenti.",when:TODAY,task:null,keys:[]})));
+  promemoria().filter(p=>!p.fatto&&p.quando<addH(adesso(),24)).forEach(p=>{ const late=p.quando<adesso(), o=p.oid&&ord(p.oid),
+    w={sev:late?"media":"bassa",cat:"Promemoria",titolo:`${late?"Scaduto":"Entro 24 h"}: ${p.testo}`,dettaglio:`${o?o.numero+" · "+o.cliente+" · ":""}entro ${GG[p.quando.getDay()]} ${dm(p.quando)} ${hm(p.quando)}`,azione:"Fallo e segnalo come fatto (Notifiche & ore › Promemoria o dettaglio ordine)."};
+    o?push({...w},o,"A"):list.push({...w,when:p.quando,task:null,keys:[]}); });
+  giorniMese("").filter(g=>g.a&&(g.es?.[1]==="err"||g.totDiverso)).forEach(g=>list.push({sev:"media",cat:"Cartellino",
+    titolo:`${g.a.nome} ${dm(g.d)}: ${g.totDiverso?"totale del file diverso dalle timbrature":g.es[0].toLowerCase()}`,dettaglio:`${g.coop?.nome||g.c.area} · timbrate ${fmtH(g.m.tot)}, in piano ${fmtH(g.p.tot)}${g.c.commento?" · "+g.c.commento:""}`,
+    azione:"Verifica con la cooperativa (Notifiche & ore › Cartellini e consuntivo).",when:g.d,task:null,keys:[]}));
   const rank={alta:0,media:1,bassa:2};
   list.sort((a,b)=>rank[a.sev]-rank[b.sev]||a.when-b.when);
   /* ogni avviso da risolvere (patente, capacità, mezzo in manutenzione, assenza, sovrapposizione) fa pulsare i task della sua tratta */
@@ -1297,13 +1326,13 @@ const VIEWS={
   ordini:{l:"Ordini",i:"list",sub:"Offerte importate: cerca, filtra per stato e servizio, ordina per colonna"},
   risorse:{l:"Risorse",i:"users",sub:"Addetti, mezzi, squadre, trasportatori, articoli, zone ZTL, micro-task e tabelle di lookup"},
   magazzino:{l:"Magazzino",i:"box",sub:"Report da stampare: cosa preparare e cosa deve rientrare, ordine per ordine"},
-  notifiche:{l:"Notifiche & ore",i:"users",sub:"Alert pendenti e riconciliazione ore"},
+  notifiche:{l:"Notifiche & ore",i:"users",sub:"Alert pendenti, cartellini delle cooperative e consuntivo del mese"},
   componenti:{l:"Componenti",i:"grid",sub:"Catalogo dei componenti riutilizzati in tutta l'applicazione"}
 };
 
 function topActions(){
   if(state.view!=="risorse") return "";
-  const mappa={addetti:"addetti",mezzi:"mezzi",trasportatori:"trasportatori",articoli:"articoli",zone:"zone"};
+  const mappa={addetti:"addetti",mezzi:"mezzi",cooperative:"cooperative",trasportatori:"trasportatori",articoli:"articoli",zone:"zone"};
   const tipo=mappa[state.rtab];
   return tipo?`<button class="btn btn-primary" data-act="crud-new" data-tipo="${tipo}">+ Nuovo ${crudLabel(tipo)}</button>`:"";
 }
@@ -1372,6 +1401,8 @@ function viewGiornata(){
   const daAss=righe.filter(r=>!r.persone.length||!r.mezzo).length+carichi.filter(t=>!t.risorse.length).length;
   const conAvv=righe.filter(r=>avvRiga(r).length).length;
   const tab=state.gtab||"uscite";
+  /* da fare per il pianificatore: i promemoria del giorno, più quelli scaduti e aperti se il giorno è oggi */
+  const daFare=promemoria().filter(p=>dkey(p.quando)===k||(!p.fatto&&p.quando<d&&k===dkey(TODAY))), daFareN=daFare.filter(p=>!p.fatto).length;
 
   /* filtri della scheda Uscite */
   const testo=r=>[r.o.cliente,r.o.numero,r.o.location,r.persone.join(" "),r.mezzo||"",r.o.resp].join(" ");
@@ -1414,6 +1445,8 @@ function viewGiornata(){
         <span class="gl-l2">${t.risorse.length?esc(t.risorse.join(", ")):'<span class="need">Da assegnare</span>'} · ${esc(t.mezzi.join(" + ")||(o.servizio==="ritiro"?"ritira il cliente":"mezzo da scegliere"))}</span></span>
         <span class="gl-side"><span class="tiny muted">parte</span><span class="mono small">${!v?"—":dkey(v.inizio)===k?"oggi "+hm(v.inizio):GG[v.inizio.getDay()]+" "+hm(v.inizio)}</span></span></button></div>`;})
       :'<div class="empty"><strong>Nessun carico in programma</strong></div>'}</div>`;
+  } else if(tab==="dafare"){
+    lista=`<div class="card-body" style="border-bottom:1px solid var(--border)">${promForm()}</div><div class="gl-scroll"><div class="alerts">${daFare.map(p=>promRiga(p)).join("")||'<div class="empty"><strong>Niente da fare per il pianificatore in questa giornata</strong></div>'}</div></div>`;
   } else {
     /* per squadra: la giornata di ciascuna persona e di ciascun mezzo */
     const giro=(key,isM)=>delGiorno.filter(t=>isM?t.mezzi.includes(key):t.risorse.includes(key)).sort((a,b)=>a.inizio-b.inizio);
@@ -1439,7 +1472,7 @@ function viewGiornata(){
   </section>
   <div class="giorno">
     <section class="card gl">
-      ${UI.schede("gtab",[["uscite",`Uscite <span class="chip">${righe.length}</span>`],["magazzino",`In magazzino <span class="chip">${carichi.length}</span>`],["squadra","Per squadra"]])}
+      ${UI.schede("gtab",[["uscite",`Uscite <span class="chip">${righe.length}</span>`],["magazzino",`In magazzino <span class="chip">${carichi.length}</span>`],["squadra","Per squadra"],["dafare",`Da fare <span class="chip${daFare.some(p=>!p.fatto&&p.quando<adesso())?" err":""}">${daFareN}</span>`]])}
       ${lista}
     </section>
     <aside class="card gside" aria-label="Personale e mezzi del giorno">
@@ -1586,7 +1619,7 @@ function ganttOrdini(R){
     const open=state.expanded.has(o.id), [st,sc]=statoOrdine(o);
     const lead=`<button class="chev" data-act="toggle" data-id="${o.id}" aria-expanded="${open}" aria-label="${open?"Comprimi":"Espandi"} ${esc(o.cliente)}">${icon("chev",15)}</button>`;
     let html=gRow(`<span class="row" style="gap:6px"><i class="dot ${sc}" title="${st}"></i><span class="grow" style="overflow:hidden;text-overflow:ellipsis">${esc(o.cliente)}</span></span>`,`${esc(o.numero)} · ${esc(o.location.split(" — ").pop())}`,
-      o.tasks.map(t=>bar(t,R,{top:16,h:22})).join(""),{lead,cells:celle(o.tasks,R)});
+      o.tasks.map(t=>bar(t,R,{top:16,h:22})).join("")+promemoria().filter(p=>p.oid===o.id).map(p=>promMark(p,R)).join(""),{lead,cells:celle(o.tasks,R)});
     if(open) html+=[...o.tasks].sort((a,b)=>a.inizio-b.inizio).map(t=>gRow(esc(tl(t)),`${hm(t.inizio)}–${hm(t.fine)} · ${esc(t.risorse.length?t.risorse.map(n=>n.split(" ")[0]).join(", "):"da assegnare")}`,bar(t,R),{cls:"child",cells:celle([t],R)})).join("");
     return html;
   }).join("");
@@ -1643,7 +1676,7 @@ function viewPianificazione(){
   const R=range();
   const inR=state.av.list.filter(w=>w.when<R.e&&w.when>=addD(R.s,-1));
   const altri=state.av.list.length-inR.length;
-  const body=state.mode==="ordine"?ganttOrdini(R):ganttRisorse(R);
+  const body=promRow(R)+(state.mode==="ordine"?ganttOrdini(R):ganttRisorse(R));
   return `<div class="planner">
     <section class="card">
       <div class="card-head">
@@ -1720,9 +1753,10 @@ function viewRisorse(){
       {key:"patenti",t:"Patenti",sort:false,cella:a=>a.patenti.length?a.patenti.map(p=>UI.stato(p,"ok")).join(" "):nulla},
       {key:"cert",t:"Certificazioni",sort:false,cella:a=>a.cert.map(x=>UI.stato(x)).join(" ")||nulla},
       {key:"orario",t:"Orario"},
-      {key:"carico",t:"Carico settimana",tipo:"numero",valore:a=>oreSettimana(a.nome,ref),cella:a=>UI.misura(oreSettimana(a.nome,ref),a.maxOreSettimana||40,"h"),num:false},
+      {key:"carico",t:`Ore pianificate ${dm(monday(ref))}–${dm(addD(monday(ref),6))}`,tipo:"numero",valore:a=>oreSettimana(a.nome,ref),cella:a=>UI.misura(oreSettimana(a.nome,ref),a.maxOreSettimana||40,"h"),num:false},
       {key:"valutazione",t:"Valutazione",tipo:"numero",cella:a=>"★".repeat(a.valutazione)+"☆".repeat(5-a.valutazione)},
       {key:"assenze",t:"Assenze",sort:false,cella:a=>a.assenze.map(x=>UI.stato(x.intera===false?`${x.tipo} ${dm(new Date(x.giorno))} ${x.dalle||""}–${x.alle||""}`:`${x.tipo} ${dm(new Date(x.da))}${x.a!==x.da?"–"+dm(new Date(x.a)):""}`)).join(" ")||nulla},
+      {key:"docs",t:"Documenti",sort:false,cella:a=>{const p=docProblemi(a); return p.length?p.map(([d,[t,,l]])=>UI.stato(`${d.tipo}: ${t.toLowerCase()}`,l>1?"err":"warn")).join(" "):(a.docs||[]).length?UI.stato(`${a.docs.length} in regola`,"ok"):nulla;}},
       {key:"azioni",t:"Azioni",sort:false,cella:a=>crudButtons("addetti",ADDETTI.indexOf(a))}]});
     corpo=`<div class="card-body dt-filtri">${filtri}</div>${tabella}`;
     piede=`Carico calcolato sulla settimana del ${dm(monday(ref))}. Gli addetti senza patente non vengono mai proposti alla guida.`;
@@ -1780,6 +1814,11 @@ function viewRisorse(){
       UI.datatable({id:"articoli",righe,perPagina:20,vuoto:"Nessun articolo",colonne:[
         {t:"Codice",mono:true},{t:"Descrizione"},{t:"Categoria"},{t:"Volume",tipo:"numero"},{t:"Peso",tipo:"numero"},{t:"Carico / pz",tipo:"numero"},{t:"Allestimento / pz",tipo:"numero"},{t:"Azioni",sort:false}]});
     piede="Anagrafica articoli separata: il codice è la chiave (futura FK). Le righe d'ordine senza codice presente appaiono come «Da censire» e non vengono inserite qui.";
+  } else if(state.rtab==="cooperative"){
+    const eur=x=>`€ ${num(x,2)}`;
+    corpo=UI.tabella({colonne:[{t:"Cooperativa"},{t:"Addetti",num:true},{t:"Ordinaria",num:true},{t:"Straordinario",num:true},{t:"Notturno (+)",num:true},{t:"Festivo",num:true},{t:"Trasferta / giorno",num:true},{t:"Straord. oltre",num:true},{t:"Note"},{t:"Azioni"}],
+      righe:COOPERATIVE.map((c,i)=>[`<strong>${esc(c.nome)}</strong>`,ADDETTI.filter(a=>a.tipo==="cooperativa"&&COOP(a.coop)===c).length,eur(c.tariffe.ord)+"/h",eur(c.tariffe.stra)+"/h",eur(c.tariffe.notte)+"/h",eur(c.tariffe.fest)+"/h",eur(c.tariffe.trasf),`${c.soglia} h/giorno`,`<span class="small">${esc(c.note||"")}</span>`,crudButtons("cooperative",i)])});
+    piede="Tariffe usate dal consuntivo dei cartellini (Notifiche & ore). Straordinario e festivo sostituiscono l'ordinaria; il notturno (22–6) si somma.";
   } else if(state.rtab==="zone"){
     const righe=UI.filtra("zone",ZONE,z=>[z.nome,z.citta,z.fascia,z.permesso].join(" "),{}).map(z=>({celle:[
       `<strong>${esc(z.nome)}</strong><div class="tiny muted">${esc(z.citta)}</div>`,z.citta,`<span class="small">${z.fascia}</span>`,
@@ -1810,7 +1849,7 @@ function viewRisorse(){
     corpo=`<div class="lk-grid">${sec("ruoli","Ruoli",RUOLI)}${sec("patenti","Patenti",PATENTI)}${sec("certificazioni","Certificazioni",CERTIFICAZIONI)}${sec("statiMezzi","Tipi di fermo mezzo",STATI_MEZZI)}</div>`;
     piede="Queste tabelle alimentano i menu di selezione di addetti (ruoli, patenti, certificazioni) e mezzi (tipi di fermo). Le modifiche valgono per la sessione corrente.";
   }
-  return UI.pannello({testata:UI.schede("rtab",[["addetti","Addetti"],["mezzi","Mezzi"],["squadre","Squadre"],["trasportatori","Trasportatori"],["articoli","Articoli"],["zone","Zone ZTL"],["task","Micro-task e formule"],["lookup","Tabelle"]]),corpo,piede});
+  return UI.pannello({testata:UI.schede("rtab",[["addetti","Addetti"],["mezzi","Mezzi"],["squadre","Squadre"],["cooperative","Cooperative"],["trasportatori","Trasportatori"],["articoli","Articoli"],["zone","Zone ZTL"],["task","Micro-task e formule"],["lookup","Tabelle"]]),corpo,piede});
 }
 
 /* ============================================================
@@ -1865,44 +1904,210 @@ function esportaMagazzinoCSV(){
 /* ============================================================
    VISTA: NOTIFICHE & ORE
    ============================================================ */
-function alertNotifiche(){
-  return state.ordini.filter(o=>legMezzi(o,"A").includes("Motrice + semirimorchio")).map(o=>({
-    id:"mot-"+o.id,tipo:"Conferma motrice",testo:`Conferma disponibilità Motrice + semirimorchio per ${o.cliente} (${o.numero})`,when:new Date(o.consegna),oid:o.id
-  })).concat(state.ordini.filter(o=>o.zona).map(o=>({
-    id:"ztl-"+o.id,tipo:"Autorizzazione ZTL",testo:`Richiedi autorizzazione ${o.zona} per ${o.cliente} (${o.numero})`,when:new Date(o.consegna),oid:o.id
-  })));
+/* ============ PROMEMORIA DEL PIANIFICATORE ============
+   Le cose che deve fare chi pianifica (prenotare, chiedere permessi, confermare), con una scadenza.
+   Automatici dalle regole (anticipo in ore rispetto alla partenza) o scritti a mano, sull'ordine o generali.
+   Quelli dell'ordine stanno nell'ordine (o.prom, o.promFatti), così entrano nel registro modifiche e si annullano. */
+const REGOLE_PROM=[
+  {k:"trasp",l:"Prenotare il trasportatore esterno",ore:48,
+    genera:o=>["A","B"].map(leg=>{ const e=legEsterno(o,leg), t=legMezzoTasks(o,leg)[0]; return e&&t&&{k:"trasp"+leg,testo:`Prenota ${e.nome} per ${LEG[leg].toLowerCase()} del ${dm(t.inizio)} alle ${hm(t.inizio)}`,base:t.inizio}; })},
+  {k:"ztl",l:"Richiedere il permesso ZTL",ore:72,genera:o=>o.zona?[{k:"ztl",testo:`Richiedi il permesso «${ZONA[o.zona]?.permesso||o.zona}» (${o.zona})`,base:new Date(o.consegna)}]:[]},
+  {k:"motrice",l:"Confermare la motrice",ore:48,genera:o=>legMezzi(o,"A").includes("Motrice + semirimorchio")?[{k:"motrice",testo:"Conferma la disponibilità di Motrice + semirimorchio",base:new Date(o.consegna)}]:[]}];
+let PROMEMORIA=[], PID=0;  // generali, non legati a un ordine
+/* "adesso" nel prototipo: il giorno finto di oggi all'ora reale */
+const adesso=()=>{ const n=new Date(), d=new Date(TODAY); d.setHours(n.getHours(),n.getMinutes()); return d; };
+function promemoria(){
+  const out=[];
+  state.ordini.forEach(o=>{
+    REGOLE_PROM.forEach(r=>r.genera(o).filter(Boolean).forEach(x=>out.push({id:o.id+"|"+x.k,oid:o.id,testo:x.testo,quando:addH(x.base,-r.ore),fatto:(o.promFatti||[]).includes(x.k),auto:`${r.l}, ${r.ore} h prima`})));
+    (o.prom||[]).forEach(p=>out.push({...p,oid:o.id,quando:new Date(p.quando)}));
+  });
+  PROMEMORIA.forEach(p=>out.push({...p,oid:null,quando:new Date(p.quando)}));
+  return out.sort((a,b)=>a.quando-b.quando);
+}
+const promStato=p=>p.fatto?["fatto","ok"]:p.quando<adesso()?["scaduto","err"]:p.quando<addH(adesso(),24)?["entro 24 h","warn"]:["in programma","info"];
+function promRiga(p,conOrdine=true){
+  const [s,c]=promStato(p), o=p.oid&&ord(p.oid);
+  return `<div class="alert prom${p.fatto?" done":""}"><i class="dot ${c}"></i>
+    <span class="a-t"><span class="mono">${GG[p.quando.getDay()]} ${dm(p.quando)} ${hm(p.quando)}</span> · ${esc(p.testo)}</span>
+    <span class="a-d">${conOrdine&&o?`<button class="mt-name" data-act="order" data-id="${o.id}">${esc(o.numero)} · ${esc(o.cliente)}</button> · `:""}${p.auto?"automatico: "+esc(p.auto):"scritto a mano"}</span>
+    <span class="a-f row" style="gap:6px">${UI.stato(s,c)}<button class="btn btn-sm" data-act="prom-fatto" data-pid="${esc(p.id)}">${p.fatto?"Riapri":"Fatto"}</button>${p.auto?"":`<button class="btn btn-sm btn-ghost" data-act="prom-del" data-pid="${esc(p.id)}">Elimina</button>`}</span></div>`;
+}
+/* form di inserimento: sull'ordine propone 48 h prima della consegna */
+function promForm(oid=""){
+  const o=oid&&ord(oid), d=o?addH(new Date(o.consegna),-48):addH(adesso(),2);
+  return `<div class="row prom-new" style="gap:8px;flex-wrap:wrap"><input class="pn-testo" aria-label="Cosa fare" placeholder="Cosa devi fare (es. prenota il trasportatore)" style="flex:1;min-width:220px">
+    <input type="datetime-local" class="pn-quando" aria-label="Entro quando" value="${dkey(d)}T${hm(d)}" style="width:auto">
+    ${o?"":`<select class="pn-oid" aria-label="Ordine" style="width:auto"><option value="">Nessun ordine</option>${state.ordini.map(x=>`<option value="${x.id}">${esc(x.numero)} · ${esc(x.cliente)}</option>`).join("")}</select>`}
+    <button class="btn btn-sm" data-act="prom-add" data-id="${oid}">+ Aggiungi</button></div>`;
+}
+/* marcatori sul Gantt: un rombo all'ora di scadenza */
+const promMark=(p,R)=>{ if(p.quando<R.s||p.quando>=R.e) return ""; const [s,c]=promStato(p), o=p.oid&&ord(p.oid);
+  return `<button class="pmark ${c}" style="left:${R.x(p.quando)}px" ${o?`data-act="order" data-id="${o.id}"`:'data-act="view" data-v="notifiche"'} title="${esc(`${dm(p.quando)} ${hm(p.quando)} · ${p.testo}${o?" · "+o.numero:""} (${s})`)}" aria-label="Promemoria: ${esc(p.testo)}"></button>`; };
+function promRow(R){
+  const ps=promemoria().filter(p=>p.quando>=R.s&&p.quando<R.e), aperti=ps.filter(p=>!p.fatto).length;
+  return gRow("<strong>Da fare · pianificatore</strong>",`${aperti} ${aperti===1?"promemoria aperto":"promemoria aperti"} nel periodo`,ps.map(p=>promMark(p,R)).join(""),{h:34,cls:"prom-row"});
 }
 function viewNotifiche(){
-  const alerts=alertNotifiche();
+  const schede=UI.schede("ntab",[["alert","Promemoria"],["ore","Cartellini e consuntivo"]]);
   if(state.ntab==="alert"){
-    const inviati=state.inviati||new Set();
-    const lista=alerts.map(a=>`<div class="alert"><i class="dot info"></i><span class="a-t">${esc(a.tipo)}</span><span class="a-d">${esc(a.testo)}</span>
-      <span class="a-f"><button class="btn btn-sm" data-act="segna-inviato" data-aid="${esc(a.id)}">${inviati.has(a.id)?"Inviato":"Segna come inviato"}</button>
-      <button class="btn btn-sm btn-ghost" data-act="invia-whatsapp" data-aid="${esc(a.id)}">Invia mock WhatsApp</button></span></div>`).join("");
-    return UI.pannello({testata:UI.schede("ntab",[["alert","Alert"],["ore","Riconciliazione ore"]]),corpo:`<div class="card-body">${lista||'<div class="empty">Nessun alert pendente</div>'}</div>`});
+    const P=promemoria(), a=adesso(), sett=addD(a,7), aperti=P.filter(p=>!p.fatto);
+    const gruppo=(t,xs,aperto=true)=>xs.length?UI.piegabile({titolo:t,conteggio:xs.length,aperto,corpo:`<div class="alerts">${xs.map(p=>promRiga(p)).join("")}</div>`}):"";
+    return UI.pannello({testata:schede,corpo:`<div class="card-body">${promForm()}
+      <div style="margin-top:12px">${gruppo("Scaduti",aperti.filter(p=>p.quando<a))}${gruppo("Prossimi 7 giorni",aperti.filter(p=>p.quando>=a&&p.quando<sett))}${gruppo("Più avanti",aperti.filter(p=>p.quando>=sett))}${gruppo("Fatti",P.filter(p=>p.fatto),false)}
+      ${P.length?"":'<div class="empty">Nessun promemoria</div>'}</div></div>`,
+      piede:`Promemoria automatici: ${REGOLE_PROM.map(r=>`${r.l.toLowerCase()} (${r.ore} h prima)`).join(", ")}. Gli altri si scrivono qui o nel dettaglio dell'ordine. Compaiono anche nel Gantt (riga «Da fare»), nel Foglio del giorno (scheda «Da fare») e, se scaduti, negli avvisi.`});
   }
-  const genera=()=>{
-    RAPPORTINI=ADDETTI.flatMap(a=>{
-      const base=Math.round(oreSettimana(a.nome,state.date)*4)/4;
-      return [{persona:a.nome,data:dkey(state.date),orePianificate:base,oreEffettive:base+(Math.random()>.7?Math.round((Math.random()-.5)*2)/2:0),oreFatturate:base}];
+  return UI.pannello({testata:schede,corpo:viewConsuntivo(),
+    piede:"Solo addetti di cooperativa. Le ore effettive sono quelle pianificate (finché non c'è la chiusura giornaliera): il confronto è cartellino ↔ piano, tolleranza ±30 min al giorno. Il piano non ha la pausa pranzo, che nel cartellino è il buco tra un'uscita e l'entrata successiva."});
+}
+
+/* ============================================================
+   CARTELLINI E CONSUNTIVO (cooperative)
+   ============================================================ */
+const XLSX_URL="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const minuti=s=>{const m=/(\d{1,3})[:.](\d{2})/.exec(s||""); return m?+m[1]*60+ +m[2]:null;};
+const fmtH=min=>`${min<0?"−":""}${Math.floor(Math.abs(min)/60)}:${pad(Math.round(Math.abs(min)%60))}`;
+const MALATTIA=/male|malat|non sta bene/i, TRASF=/trasf/i, TOLL=30;  // ponytail: tolleranza fissa, va nella configurazione avvisi
+const COOP=n=>COOPERATIVE.find(c=>c.nome.toLowerCase()===(n||"").trim().toLowerCase());
+/* "BETTINESCHI2 JORDIE" e "Jordie Bettineschi" hanno la stessa chiave */
+const chiaveNome=s=>(s||"").toUpperCase().replace(/[^A-ZÀ-Ü ]/g,"").split(/\s+/).filter(Boolean).sort().join(" ");
+const abbina=nominativo=>ADDETTI.find(a=>a.cartellino===nominativo)||ADDETTI.find(a=>chiaveNome(a.nome)===chiaveNome(nominativo));
+/* minuti timbrati di un giorno e quota notturna (22–6); un'uscita alle 00:00 o prima dell'entrata è dopo mezzanotte */
+function minutiCart(c){
+  let tot=0, notte=0;
+  c.turni.forEach(([e,u])=>{ const a=minuti(e); let b=minuti(u); if(a==null||b==null) return; if(b<=a) b+=1440;
+    tot+=b-a; [[0,360],[1320,1800]].forEach(([x,y])=>notte+=Math.max(0,Math.min(b,y)-Math.max(a,x))); });
+  return {tot,notte};
+}
+/* ore pianificate (= effettive per ora) di una persona in un giorno, divise per ordine */
+function pianoGiorno(nome,d){
+  const e=addD(d,1), per={}; let tot=0, da=null, a=null, fuori=false;
+  tutti().filter(t=>t.risorse.includes(nome)&&t.inizio<e&&d<t.fine).forEach(t=>{
+    if(t.leg==="A"||t.leg==="B") fuori=true; if(!lavoro(t)) return;
+    const x=new Date(Math.max(d,t.inizio)), y=new Date(Math.min(e,t.fine)), m=(y-x)/60000;
+    tot+=m; per[t.oid]=(per[t.oid]||0)+m; if(!da||x<da) da=x; if(!a||y>a) a=y; });
+  return {tot,per,da,a,fuori};
+}
+function esito(c,p,m){
+  if(MALATTIA.test(c.commento)) return p.tot?["Malattia, era in piano","err"]:["Malattia","warn"];
+  if(m.tot&&!p.tot) return ["Non in piano","warn"];
+  if(!m.tot&&p.tot) return ["In piano, non timbrato","err"];
+  if(!m.tot) return null;
+  const d=m.tot-p.tot; return Math.abs(d)<=TOLL?["In linea","ok"]:[d>0?"Più ore del piano":"Meno ore del piano","warn"];
+}
+/* consuntivo del mese: una riga per giorno timbrato, con costo e ripartizione sugli ordini del piano */
+function giorniMese(mese){
+  return CARTELLINI.filter(c=>c.data.startsWith(mese)).map(c=>{
+    const d=new Date(c.data+"T00:00"), a=c.persona&&ADD[c.persona], coop=COOP(a?.coop)||COOP(c.area), m=minutiCart(c);
+    const p=a?pianoGiorno(a.nome,d):{tot:0,per:{},fuori:false}, t=coop?.tariffe, soglia=(coop?.soglia||8)*60, fest=festivo(d);
+    const ord=fest?0:Math.min(m.tot,soglia), stra=fest?0:Math.max(0,m.tot-soglia), fes=fest?m.tot:0, trasf=TRASF.test(c.commento)&&m.tot>0;
+    const costo=t?(ord*t.ord+stra*t.stra+fes*t.fest+m.notte*t.notte)/60+(trasf?t.trasf:0):0;
+    return {c,d,a,coop,m,p,ord,stra,fes,trasf,costo,es:esito(c,p,m),trasfNonPrevista:trasf&&!p.fuori,totDiverso:c.totFile!=null&&c.totFile!==m.tot};
+  }).sort((x,y)=>x.d-y.d);
+}
+async function importaCartellini(files){
+  try{ if(!window.XLSX) await script(XLSX_URL); }catch{ toast("Libreria Excel non raggiungibile: serve internet per importare i cartellini.","warn"); return; }
+  const nuovi=[];
+  for(const f of files){
+    const wb=XLSX.read(await f.arrayBuffer());
+    wb.SheetNames.forEach(sn=>{
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:""});
+      const h=rows.findIndex(r=>r.includes("Data")&&r.includes("Nominativo")); if(h<0) return;
+      const col=k=>rows[h].indexOf(k), cel=(r,k)=>String(r[col(k)]??"").trim();
+      rows.slice(h+1).forEach(r=>{
+        const dt=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(cel(r,"Data")); if(!dt||!cel(r,"Nominativo")) return;
+        nuovi.push({nominativo:cel(r,"Nominativo"),area:cel(r,"Area"),data:`${dt[3]}-${pad(+dt[2])}-${pad(+dt[1])}`,
+          turni:[1,2,3,4].map(i=>[cel(r,"E"+i),cel(r,"U"+i)]).filter(([e,u])=>e&&u),
+          commento:[cel(r,"Nota"),cel(r,"Commento")].filter(Boolean).join(" · "),totFile:minuti(cel(r,"Totale")),file:f.name});
+      });
     });
-  };
-  const righe=RAPPORTINI.map(r=>{
-    const delta=Math.round((r.oreEffettive-r.orePianificate)*100)/100;
-    return {celle:[esc(r.persona),r.data,num(r.orePianificate,2),num(r.oreEffettive,2),num(r.oreFatturate,2),`<span class="${Math.abs(delta)>.25?'t-err':''}">${delta>=0?'+':''}${num(delta,2)} h</span>`]};
+  }
+  if(!nuovi.length){ toast("Nessun cartellino riconosciuto: servono le colonne Data, Nominativo, E1/U1…","warn"); return; }
+  caricaCartellini(nuovi);
+}
+/* i giorni già caricati per la stessa persona vengono sostituiti (reimport a fine mese) */
+function caricaCartellini(nuovi){
+  const k=c=>c.nominativo+"|"+c.data, sost=new Set(nuovi.map(k));
+  nuovi.forEach(c=>c.persona=abbina(c.nominativo)?.nome||null);
+  CARTELLINI=[...CARTELLINI.filter(c=>!sost.has(k(c))),...nuovi];
+  state.cmese=nuovi[0].data.slice(0,7);
+  const pers=new Set(nuovi.map(c=>c.nominativo)), da=nuovi.filter(c=>!c.persona).length;
+  toast(`Caricati ${nuovi.length} giorni di ${pers.size} ${pers.size>1?"persone":"persona"}${da?" · da abbinare: "+[...new Set(nuovi.filter(c=>!c.persona).map(c=>c.nominativo))].join(", "):""}`); render();
+}
+/* dimostrativo: cartellini delle cooperative ricavati dal piano del mese, con qualche scostamento voluto */
+function cartelliniDemo(){
+  const mese=state.cmese||dkey(state.date).slice(0,7), [y,mm]=mese.split("-").map(Number), n=new Date(y,mm,0).getDate(), out=[];
+  ADDETTI.filter(a=>a.tipo==="cooperativa").forEach((a,ai)=>{
+    const nom=a.nome.split(" ").reverse().join(" ").toUpperCase(); let k=0;
+    for(let g=1;g<=n;g++){ const d=new Date(y,mm-1,g), p=pianoGiorno(a.nome,d), base={nominativo:nom,area:a.coop,data:dkey(d),commento:"",totFile:null,file:"dimostrativo"};
+      if(!p.tot){ if(ai===0&&g===14) out.push({...base,turni:[["08:00","12:00"]]}); continue; }  // giornata non in piano
+      k++; const extra=(k+ai)%5===0?45:(k+ai)%7===0?-60:0;
+      if(ai===1&&k===2){ out.push({...base,turni:[],commento:"assente non sta bene"}); continue; }  // malattia
+      out.push({...base,turni:[[hm(p.da),hm(new Date(+p.a+extra*60000))]],commento:p.fuori?"trasf":""});
+    }
   });
-  return UI.pannello({testata:UI.schede("ntab",[["alert","Alert"],["ore","Riconciliazione ore"]]),corpo:`
-    <div class="card-body">
-      <div class="row" style="margin-bottom:12px"><input type="file" id="rapportiniFile" accept=".csv,.xlsx,.xls" class="btn btn-sm" style="width:auto"><button class="btn btn-sm" data-act="carica-rapportini">Carica rapportini dimostrativo</button></div>
-      ${RAPPORTINI.length?UI.tabella({colonne:[{t:"Persona"},{t:"Data",mono:true},{t:"Pianificate",num:true},{t:"Effettive",num:true},{t:"Fatturate",num:true},{t:"Δ",num:true}],righe}):'<div class="empty">Nessun rapportino caricato</div>'}
-    </div>`,piede:"File fittizio: carica un CSV/Excel o genera i rapportini dimostrativi."});
+  if(!out.length){ toast("Nessun addetto di cooperativa in piano nel mese.","warn"); return; }
+  caricaCartellini(out);
+}
+function viewConsuntivo(){
+  const mese=state.cmese||=dkey(state.date).slice(0,7), G=giorniMese(mese), ctab=state.ctab||="persone";
+  const eur=x=>`€ ${num(x,2)}`, dlt=x=>`<span class="${Math.abs(x)>TOLL?"t-warn":""}">${x>0?"+":""}${fmtH(x)}</span>`;
+  const testa=`<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <label class="small" for="cmese">Mese</label><input type="month" id="cmese" value="${mese}" style="width:auto">
+      <span class="grow"></span>
+      <label class="btn btn-sm" style="cursor:pointer">Importa cartellini (.xlsx)<input type="file" id="cartFile" accept=".xlsx,.xls" multiple hidden></label>
+      <button class="btn btn-sm btn-ghost" data-act="cart-demo">Cartellini dimostrativi</button>
+      ${CARTELLINI.length?`<button class="btn btn-sm btn-ghost" data-act="cart-svuota">Svuota</button>`:""}</div>`;
+  /* persone di cooperativa in piano nel mese senza cartellino */
+  const [y,mm]=mese.split("-").map(Number), s=new Date(y,mm-1,1), e=new Date(y,mm,1);
+  const mancanti=ADDETTI.filter(a=>a.tipo==="cooperativa"&&!G.some(g=>g.a===a)&&tutti().some(t=>lavoro(t)&&t.risorse.includes(a.nome)&&t.inizio<e&&s<t.fine));
+  const daAbb=[...new Set(G.filter(g=>!g.a).map(g=>g.c.nominativo))];
+  const avvAbb=daAbb.map(n=>`<div class="alert"><i class="dot warn"></i><span class="a-t">Da abbinare</span><span class="a-d">«${esc(n)}» non corrisponde a nessun addetto</span>
+      <span class="a-f">${UI.selezione({id:"abb-"+n.replace(/\W/g,""),etichetta:"Addetto",attr:`data-abbina="${esc(n)}"`,opzioni:[["","Scegli l'addetto…"],...ADDETTI.filter(a=>a.tipo==="cooperativa").map(a=>[a.nome,`${a.nome} · ${a.coop}`])]})}</span></div>`).join("")
+    +mancanti.map(a=>`<div class="alert"><i class="dot err"></i><span class="a-t">Cartellino mancante</span><span class="a-d">${esc(a.nome)} (${esc(a.coop)}) ha ore in piano nel mese ma nessun cartellino caricato</span></div>`).join("");
+  if(!G.length) return `<div class="card-body">${testa}${avvAbb?`<div class="alerts" style="margin-bottom:12px">${avvAbb}</div>`:""}<div class="empty">Nessun cartellino per ${MESI[mm-1]} ${y}. Importa i file .xlsx della cooperativa o genera quelli dimostrativi.</div></div>`;
+  const somma=(xs,f)=>xs.reduce((t,x)=>t+f(x),0), gruppi=(xs,f)=>xs.reduce((m,x)=>{const k=f(x); (m.get(k)||m.set(k,[]).get(k)).push(x); return m;},new Map());
+  let corpo="";
+  if(ctab==="persone"){
+    const P=gruppi(G.filter(g=>g.a),g=>g.a.nome);
+    const righe=[...P].map(([n,gs])=>{ const tim=somma(gs,g=>g.m.tot), pia=somma(gs,g=>g.p.tot), anom=gs.filter(g=>g.es&&g.es[1]!=="ok"||g.trasfNonPrevista||g.totDiverso).length;
+      return [`<strong>${esc(n)}</strong><div class="tiny muted">${esc(gs[0].coop?.nome||gs[0].c.area||"—")}</div>`,gs.filter(g=>g.m.tot).length,fmtH(tim),fmtH(pia),dlt(tim-pia),
+        fmtH(somma(gs,g=>g.stra)),fmtH(somma(gs,g=>g.m.notte)),fmtH(somma(gs,g=>g.fes)),gs.filter(g=>g.trasf).length,gs[0].coop?eur(somma(gs,g=>g.costo)):'<span class="muted">tariffe mancanti</span>',
+        anom?UI.stato(`${anom} da verificare`,"warn"):UI.stato("in linea","ok")]; });
+    const dett=[...P].map(([n,gs])=>UI.piegabile({titolo:`Giorni · ${esc(n)}`,conteggio:gs.length,corpo:UI.tabella({colonne:[{t:"Giorno"},{t:"Timbrature",mono:true},{t:"Timbrate",num:true},{t:"Piano",mono:true},{t:"In piano",num:true},{t:"Δ",num:true},{t:"Esito"},{t:"Commento"}],
+      righe:gs.map(g=>[`${GG[g.d.getDay()]} ${dm(g.d)}${festivo(g.d)?" "+UI.stato("festivo","info"):""}`,g.c.turni.map(([a,b])=>`${a}–${b}`).join(" · ")||"—",fmtH(g.m.tot)+(g.m.notte?`<div class="tiny muted">${fmtH(g.m.notte)} notturne</div>`:""),
+        g.p.tot?`${hm(g.p.da)}–${hm(g.p.a)}`:"—",fmtH(g.p.tot),dlt(g.m.tot-g.p.tot),
+        [g.es&&UI.stato(g.es[0],g.es[1]),g.trasfNonPrevista&&UI.stato("trasferta non in piano","warn"),g.totDiverso&&UI.stato(`totale file ${fmtH(g.c.totFile)}`,"err")].filter(Boolean).join(" ")||'<span class="muted">—</span>',
+        `<span class="small">${esc(g.c.commento)}</span>`])})})).join("");
+    corpo=UI.tabella({colonne:[{t:"Persona"},{t:"Giorni",num:true},{t:"Timbrate",num:true},{t:"In piano",num:true},{t:"Δ",num:true},{t:"Straord.",num:true},{t:"Notturne",num:true},{t:"Festive",num:true},{t:"Trasferte",num:true},{t:"Costo",num:true},{t:"Stato"}],righe})+`<div style="margin-top:12px">${dett}</div>`;
+  } else if(ctab==="coop"){
+    const C=gruppi(G.filter(g=>g.coop),g=>g.coop.nome);
+    corpo=UI.tabella({colonne:[{t:"Cooperativa"},{t:"Persone",num:true},{t:"Timbrate",num:true},{t:"In piano",num:true},{t:"Δ",num:true},{t:"Straord.",num:true},{t:"Trasferte",num:true},{t:"Costo",num:true},{t:"Tariffe"}],
+      righe:[...C].map(([n,gs])=>{const t=gs[0].coop.tariffe, tim=somma(gs,g=>g.m.tot), pia=somma(gs,g=>g.p.tot);
+        return [`<strong>${esc(n)}</strong>`,new Set(gs.map(g=>g.c.nominativo)).size,fmtH(tim),fmtH(pia),dlt(tim-pia),fmtH(somma(gs,g=>g.stra)),gs.filter(g=>g.trasf).length,`<strong>${eur(somma(gs,g=>g.costo))}</strong>`,
+          `<span class="tiny muted">ord. ${eur(t.ord)} · straord. ${eur(t.stra)} · notte +${eur(t.notte)} · festivo ${eur(t.fest)} · trasferta ${eur(t.trasf)}/g</span>`];})});
+  } else {
+    /* ore e costo di ogni giorno ripartiti sugli ordini in proporzione alle ore di piano */
+    const O=new Map(), add=(k,min,eu,n)=>{const x=O.get(k)||{min:0,eu:0,pers:new Set()}; x.min+=min; x.eu+=eu; x.pers.add(n); O.set(k,x);};
+    G.filter(g=>g.a&&g.m.tot).forEach(g=>{ const ks=Object.keys(g.p.per); if(!ks.length) return add("",g.m.tot,g.costo,g.a.nome);
+      ks.forEach(k=>{const q=g.p.per[k]/g.p.tot; add(k,g.m.tot*q,g.costo*q,g.a.nome);}); });
+    corpo=UI.tabella({colonne:[{t:"Ordine"},{t:"Cliente"},{t:"Ore",num:true},{t:"Costo cooperative",num:true},{t:"Persone"}],
+      righe:[...O].sort((a,b)=>b[1].eu-a[1].eu).map(([k,x])=>{const o=k&&ord(k); return [o?`<button class="mt-name" data-act="order" data-id="${o.id}">${esc(o.numero)}</button>`:'<span class="t-warn">Senza ordine in piano</span>',o?esc(o.cliente):"—",fmtH(x.min),eur(x.eu),`<span class="small">${[...x.pers].map(esc).join(", ")}</span>`];})});
+  }
+  const tim=somma(G,g=>g.m.tot), pia=somma(G,g=>g.p.tot);
+  return `<div class="card-body">${testa}
+    ${UI.kpiRiga([[fmtH(tim),"ore timbrate"],[fmtH(pia),"ore in piano"],[(tim-pia>0?"+":"")+fmtH(tim-pia),"scostamento"],[eur(somma(G,g=>g.costo)),"costo cooperative"]])}
+    ${avvAbb?`<div class="alerts" style="margin-top:12px">${avvAbb}</div>`:""}
+    <div style="margin-top:12px">${UI.schede("ctab",[["persone","Per persona"],["coop","Per cooperativa"],["ordini","Per ordine"]])}</div>
+    <div style="margin-top:12px;overflow-x:auto">${corpo}</div></div>`;
 }
 
 /* ============================================================
    VISTA: ANAGRAFICHE
    ============================================================ */
-function crudArray(tipo){ return {articoli:ARTICOLI,addetti:ADDETTI,mezzi:MEZZI,zone:ZONE,trasportatori:TRASPORTATORI}[tipo]; }
-function crudLabel(tipo){ return {articoli:"articolo",addetti:"addetto",mezzi:"mezzo",zone:"zona ZTL",trasportatori:"trasportatore"}[tipo]; }
+function crudArray(tipo){ return {cooperative:COOPERATIVE,articoli:ARTICOLI,addetti:ADDETTI,mezzi:MEZZI,zone:ZONE,trasportatori:TRASPORTATORI}[tipo]; }
+function crudLabel(tipo){ return {cooperative:"cooperativa",articoli:"articolo",addetti:"addetto",mezzi:"mezzo",zone:"zona ZTL",trasportatori:"trasportatore"}[tipo]; }
 function crudSel(id,label,opzioni,val,full=false){ return `<div${full?' class="full"':''}>${UI.selezione({id,etichetta:label,opzioni:opzioni.map(([v,l])=>[v,l,v===val]),nascosta:false})}</div>`; }
 function crudField(id,label,val="",type="text",full=false){ return UI.campo({id,etichetta:label,valore:val,tipo:type,pieno:full}); }
 function crudArea(id,label,val="",full=false){ return `<div${full?' class="full"':''}><label class="fl" for="${id}">${label}</label><textarea id="${id}">${esc(val)}</textarea></div>`; }
@@ -1913,7 +2118,7 @@ let _assTmp=[], _ae={};
 const ASS_TIPI=["Ferie","Permesso","Riposo","Malattia"];
 const DISP={
   addetti:{lista:()=>ADDETTI,campo:"assenze",tipi:()=>ASS_TIPI,def:"Ferie",corner:"Addetto",nuovo:"Nuovo addetto",cosa:"assenza",cose:"Assenze",
-    tabs:[["anag","Anagrafica"],["comp","Competenze"]],
+    tabs:[["anag","Anagrafica"],["comp","Competenze"],["docs",'Documenti<span class="tab-n warn" id="aeDocN" hidden></span>']],
     /* colleghi = chiunque altro */
     simili:()=>true, altriSub:"assente nel mese",
     conta:n=>n?`${n} ${n===1?"collega assente":"colleghi assenti"} nel mese`:"Nessun collega assente nel mese",
@@ -2029,13 +2234,31 @@ function formAddetto(a={}){
       <div><span class="fl">Tipo risorsa</span><div class="chipgroup" role="radiogroup" aria-label="Tipo risorsa">${radio("c-tipo","interno","Interno")}${radio("c-tipo","cooperativa","Cooperativa")}</div></div>
       ${UI.campo({id:"c-orario",etichetta:"Orario / contratto",valore:v("orario"),attr:'placeholder="es. Full time 8–17"'})}
       ${crudField("c-max","Max ore / settimana",v("maxOreSettimana",40),"number")}
-      <div id="c-coop-w"${tipo==="cooperativa"?"":" hidden"}>${crudField("c-coop","Cooperativa",v("coop"))}</div>
+      <div id="c-coop-w"${tipo==="cooperativa"?"":" hidden"}>${crudSel("c-coop","Cooperativa",COOPERATIVE.map(c=>[c.nome,c.nome]),v("coop"))}</div>
+      ${UI.campo({id:"c-cart",etichetta:"Nome nel cartellino",valore:v("cartellino"),attr:'placeholder="es. ROSSI2 MARIO (se diverso dal nome)"'})}
       <div><span class="fl">Valutazione</span><div class="stars" role="radiogroup" aria-label="Valutazione">${stelle}</div></div>
       ${crudArea("c-note","Note",v("note"),true)}
     </div></section>
     <section class="ae-pane" data-pane="comp" data-off><div class="fgrid">${crudMulti("c-ruoli","Ruoli",RUOLI,v("ruoli"))}${crudMulti("c-patenti","Patenti",PATENTI,v("patenti"))}${crudMulti("c-cert","Certificazioni",CERTIFICAZIONI,v("cert"))}</div></section>
+    <section class="ae-pane" data-pane="docs" data-off style="display:flex;flex-direction:column;gap:10px">
+      <div class="row"><b class="small grow">Documenti e abilitazioni</b><button type="button" class="btn btn-sm" data-act="doc-add">+ Aggiungi documento</button></div>
+      <div class="ass-list" id="docList">${(a.docs||[]).map(rigaDoc).join("")}</div>
+      <p class="tiny muted">Avviso a 30 giorni dalla scadenza. Un documento scaduto segnala anche le tratte a cui l'addetto è assegnato.</p>
+    </section>
     ${paneDisp(DISP.addetti)}</div>`;
 }
+function rigaDoc(d={}){
+  return `<div class="ass-row doc-row"><select aria-label="Tipo documento">${DOC_TIPI.map(t=>`<option${t===d.tipo?" selected":""}>${esc(t)}</option>`).join("")}</select>
+    <input aria-label="Numero / note" placeholder="Numero / note" value="${esc(d.num||"")}"><input type="date" aria-label="Scadenza" value="${d.scadenza||""}" data-doc="1">
+    <span class="small doc-st"></span><span class="grow"></span><button type="button" class="icon-btn" data-act="doc-del" aria-label="Elimina documento">✕</button></div>`;
+}
+const leggiDocs=()=>[...document.querySelectorAll("#docList .doc-row")].map(r=>{const [s,n,d]=r.querySelectorAll("select,input"); return {tipo:s.value,num:n.value.trim(),scadenza:d.value};});
+function aggiornaDocs(){
+  let n=0; document.querySelectorAll("#docList .doc-row").forEach(r=>{const [t,c,l]=scadStato(r.querySelector('[type="date"]').value), el=r.querySelector(".doc-st"); n+=!!l; el.textContent=t; el.className="small doc-st "+c; r.classList.toggle("bad",l>1);});
+  const b=$("aeDocN"); if(b){ b.textContent=n; b.hidden=!n; }
+}
+/* documenti in scadenza (≤30 gg) o scaduti: [doc, stato] */
+const docProblemi=a=>(a.docs||[]).map(d=>[d,scadStato(d.scadenza)]).filter(([,s])=>s[2]);
 /* scadenze del mezzo: data → stato (scaduta / entro 30 giorni / ok) */
 const SCADENZE=[["revisione","Revisione"],["assicurazione","Assicurazione"],["bollo","Bollo"],["tagliando","Tagliando"]];
 function scadStato(d){
@@ -2096,6 +2319,9 @@ function crudForm(tipo,item){
   if(tipo==="addetti") return formAddetto(item);
   if(tipo==="mezzi") return formMezzo(item);
   if(tipo==="zone") return `<div class="fgrid">${crudField("c-nome","Nome zona",v("nome"))}${crudField("c-citta","Città",v("citta"))}${crudField("c-fascia","Fascia attiva",v("fascia"))}${crudField("c-euromin","Euro minimo",v("euroMin",""),"number")}${crudField("c-massamax","Massa max (t)",v("massaMax",""),"number")}${crudField("c-lungmax","Lunghezza max (m)",v("lungMax",""),"number")}${crudField("c-permesso","Permesso richiesto",v("permesso"))}${crudField("c-fonte","Fonte",v("fonte"))}</div>`;
+  if(tipo==="cooperative"){ const t=v("tariffe",{});
+    return `<div class="fgrid">${crudField("c-nome","Nome (come nella colonna Area del cartellino)",v("nome"),"text",true)}${crudField("c-ord","Ordinaria €/h",t.ord??"","number")}${crudField("c-stra","Straordinario €/h",t.stra??"","number")}${crudField("c-notte","Maggiorazione notturna 22–6 €/h",t.notte??"","number")}${crudField("c-fest","Festivo €/h",t.fest??"","number")}${crudField("c-trasf","Trasferta €/giorno",t.trasf??"","number")}${crudField("c-soglia","Straordinario oltre (h/giorno)",v("soglia",8),"number")}${crudArea("c-note","Note",v("note"),true)}</div>`;
+  }
   if(tipo==="trasportatori"){
     const tar=v("tariffa",{});
     return `<div class="fgrid">${crudField("c-nome","Nome",v("nome"))}${crudSel("c-tipo","Tipo",[["corriere","Corriere"],["noleggio","Noleggio"]],v("tipo"))}${crudSel("c-mod","Modello tariffa",[["km","A km"],["ora","A ora"],["forfait","Forfait"]],tar.modello)}${crudField("c-costokm","Costo al km",tar.costoKm||"","number")}${crudField("c-costohora","Costo ora",tar.costoOra||"","number")}${crudField("c-forfait","Forfait",tar.forfait||"","number")}${crudField("c-aff","Affidabilità 1-5",v("affidabilita",3),"number")}${crudArea("c-mezzi","Mezzi (JSON)",JSON.stringify(v("mezzi",[]),null,2),true)}${crudArea("c-note","Note",v("note"),true)}</div>`;
@@ -2120,7 +2346,7 @@ function apriCrudDialog(tipo,idx=-1){
   if(ae){
     _ae={c,item,mese:mese1(TODAY),nome:item?.nome||"",drag:null,verifica:false};
     _assTmp=(item?.[c.campo]||[]).map(x=>x.intera===false?{intera:false,tipo:x.tipo||c.def,giorno:x.giorno||"",dalle:x.dalle||"",alle:x.alle||""}:{intera:true,tipo:x.tipo||c.def,da:x.da||"",a:x.a||""});
-    renderAssenze(); if(tipo==="mezzi") aggiornaScad();
+    renderAssenze(); if(tipo==="mezzi") aggiornaScad(); else aggiornaDocs();
   }
 }
 /* dialog: aggiungi assenza/ferie/permesso a un addetto (dalla pianificazione per risorsa) */
@@ -2152,10 +2378,12 @@ function salvaCrud(tipo,idx){
   else if(tipo==="addetti"){ const multi=id=>[...document.querySelectorAll(`input[name="${id}"]:checked`)].map(x=>x.value), radio=n=>document.querySelector(`input[name="${n}"]:checked`)?.value||"";
     if(!aeValida()) return;
     const tp=radio("c-tipo")||"interno";
-    item={...base,nome:val("c-nome"),ruoli:multi("c-ruoli"),tipo:tp,coop:tp==="cooperativa"?val("c-coop"):"",patenti:multi("c-patenti"),cert:multi("c-cert"),orario:val("c-orario"),maxOreSettimana:num("c-max"),valutazione:+radio("c-val")||3,note:val("c-note"),assenze:leggiAssenze(),incompatibilita:base.incompatibilita||[]}; }
+    item={...base,nome:val("c-nome"),ruoli:multi("c-ruoli"),tipo:tp,coop:tp==="cooperativa"?val("c-coop"):"",cartellino:val("c-cart"),patenti:multi("c-patenti"),cert:multi("c-cert"),orario:val("c-orario"),maxOreSettimana:num("c-max"),valutazione:+radio("c-val")||3,note:val("c-note"),assenze:leggiAssenze(),docs:leggiDocs(),incompatibilita:base.incompatibilita||[]}; }
   else if(tipo==="mezzi"){ if(!aeValida()) return;
     item={...base,nome:val("c-nome"),tipo:val("c-tipo"),patente:val("c-patente"),vol:num("c-vol"),portata:num("c-portata"),euro:num("c-euro"),massa:num("c-massa"),lung:num("c-lung"),fermi:leggiAssenze(),scadenze:Object.fromEntries(SCADENZE.map(([k])=>[k,val("c-sc-"+k)]))}; }
   else if(tipo==="zone") item={...base,nome:val("c-nome"),citta:val("c-citta"),fascia:val("c-fascia"),euroMin:opt("c-euromin"),massaMax:opt("c-massamax"),lungMax:opt("c-lungmax"),permesso:val("c-permesso"),fonte:val("c-fonte")};
+  else if(tipo==="cooperative"){ if(!val("c-nome")){ toast("Inserisci il nome.","warn"); return; }
+    item={...base,nome:val("c-nome"),tariffe:{ord:num("c-ord"),stra:num("c-stra"),notte:num("c-notte"),fest:num("c-fest"),trasf:num("c-trasf")},soglia:num("c-soglia")||8,note:val("c-note")}; }
   else if(tipo==="trasportatori"){
     let mezzi=base.mezzi||[]; try{mezzi=JSON.parse($("c-mezzi").value||"[]");}catch{}
     item={...base,nome:val("c-nome"),tipo:val("c-tipo"),mezzi,tariffa:{modello:val("c-mod"),costoKm:opt("c-costokm"),costoOra:opt("c-costohora"),forfait:opt("c-forfait")},affidabilita:num("c-aff"),note:val("c-note")};
@@ -2229,7 +2457,10 @@ function drawerTask(id){
     return {a,ok:!x&&!b,label:`${a.nome} — ${a.ruoli.join("/")}, ${x?x.tipo.toLowerCase():b?`occupato (${ord(b.oid).cliente})`:"libero"}${guida(a)?", può guidare":""}`};}).sort((p,q)=>q.ok-p.ok);
   const mts=legMezzoTasks(o,leg), [m0,m1]=span(mts), mskip=new Set(mts.map(x=>x.id)), cap=ms.reduce((a,m)=>a+m.vol,0);
   const note=m=>[fermo(m,m0,m1)?.tipo.toLowerCase()??null,occupato(m.nome,m0,m1,mskip,true)?"occupato":null,z&&violaZTL(m,z)?"non ammesso in ZTL":null].filter(Boolean);
+  const est=legEsterno(o,leg==="C"?"A":leg);
   const mezzi=o.servizio==="ritiro"?`<p class="small">Nessun mezzo nostro: il cliente ritira e riconsegna il materiale in magazzino.</p>`
+    :est&&leg!=="C"?`<div class="people">${UI.risorsa({nome:est.nome,sotto:`Trasportatore esterno · circa € ${num(est.costo)}`,stati:[UI.stato("esterno","info")],rimuovi:`data-act="rm-esterno" data-id="${t.id}" data-name="${esc(est.nome)}"`})}</div>
+      <p class="tiny muted" style="margin-top:6px">Tratta affidata a un trasportatore esterno. Toglilo per tornare ai mezzi interni.</p>`
     :leg==="C"?`<p class="small">Si caricano i mezzi dell'andata: <strong>${esc(legMezzo(o,"A")||"non ancora scelti")}</strong>.</p>`
     :`<div class="people">${ms.map(m=>{const n=note(m); return UI.risorsa({nome:m.nome,sotto:`${m.vol} m³ · pat. ${m.patente}`,problema:n.length>0,stati:n.map(x=>UI.stato(x,"err")),rimuovi:`data-act="rm-mezzo" data-id="${t.id}" data-name="${esc(m.nome)}"`});}).join("")||UI.risorsa({nome:"Nessun mezzo assegnato",problema:true})}</div>
       ${UI.selezione({id:"mezzoAdd",etichetta:"Aggiungi mezzo",attr:`data-id="${t.id}"`,opzioni:[["","+ Aggiungi mezzo…"],...MEZZI.filter(m=>!ms.includes(m)).map(m=>{const n=note(m); return [m.nome,`${m.nome} · ${m.vol} m³ · pat. ${m.patente} — ${n.length?n.join(", "):"libero"}`];})]})}
@@ -2295,6 +2526,7 @@ function drawerOrdine(id){
           ["Ritiro",`<span class="mono">${dayLong(new Date(o.fine)).replace(/ \d{4}$/,"")} · ${hm(new Date(o.fine))}</span>`],
           ["Referente",esc(o.referente||"—")],o.nota&&["Note",`<span class="small">${esc(o.nota)}</span>`]]), "", "riep-ordine")}
         ${detPanel("ordine","Stima",UI.kpiRiga([[`${e.squadra} pers.`,`squadra · ${e.mag} in magazzino`],[legMezzo(o,"A")||"—","mezzi andata"]]),"","stima")}
+        ${detPanel("ordine",`Promemoria · ${promemoria().filter(p=>p.oid===o.id&&!p.fatto).length} aperti`,`<div class="alerts">${promemoria().filter(p=>p.oid===o.id).map(p=>promRiga(p,false)).join("")}</div><div style="margin-top:10px">${promForm(o.id)}</div>`,"","promemoria")}
         ${warns.length?detPanel("avvisi",`Da sistemare · ${warns.length}`,`<div class="alerts">${UI.avvisi(warns)}</div>`,"","avvisi-panel"):""}
       </div>
     </div>`,
@@ -2321,12 +2553,13 @@ function editorTask(o){
 function drawerAvvisi(){
   fillDrawer("Piano completo",`${state.av.list.length} avvisi`,`<div class="detail-layout"><div class="detail-full"><div class="card alerts">${alertsHtml(state.av.list)}</div></div></div>`, `<button class="btn" data-act="close-drawer">Chiudi</button>`);
 }
-function apriDialogStima(o,leg){
-  const stime=stimaTrasportatori(o,leg).sort((a,b)=>a.costo-b.costo);
+function apriDialogStima(t){
+  const o=ord(t.oid), leg=t.leg==="C"?"A":t.leg, stime=stimaTrasportatori(o,leg).sort((a,b)=>a.costo-b.costo);
   const d=document.createElement("dialog"); d.className="form";
   d.innerHTML=`<div class="dlg-head"><h2 class="grow">Stima costo trasportatori — ${esc(o.cliente)}</h2></div>
     <div class="dlg-body"><p class="small muted">${esc(LEG[leg])} · ${o.km} km · ${o.mezzi||1} mezzo/i</p>
-    ${stime.length?UI.tabella({colonne:[{t:"Fornitore"},{t:"Tipo"},{t:"Costo",num:true},{t:"Affidabilità"}],righe:stime.map(s=>[esc(s.nome),esc(s.tipo),`€ ${num(s.costo)}`,"★".repeat(s.affidabilita)+"☆".repeat(5-s.affidabilita)])}):'<div class="empty">Nessun trasportatore disponibile per i vincoli della tratta</div>'}</div>
+    ${stime.length?UI.tabella({colonne:[{t:"Fornitore"},{t:"Tipo"},{t:"Costo",num:true},{t:"Affidabilità"},{t:""}],righe:stime.map(s=>[esc(s.nome),esc(s.tipo),`€ ${num(s.costo)}`,"★".repeat(s.affidabilita)+"☆".repeat(5-s.affidabilita),
+      `<button class="btn btn-sm" data-act="affida-esterno" data-id="${t.id}" data-name="${esc(s.nome)}" data-v="${s.costo}">Affida</button>`])}):'<div class="empty">Nessun trasportatore disponibile per i vincoli della tratta</div>'}</div>
     <div class="dlg-foot"><button class="btn" value="ok">Chiudi</button></div>`;
   document.body.append(d); d.querySelector(".dlg-foot button").onclick=()=>closeDlg(d); d.addEventListener("close",()=>d.remove()); showDlg(d);
 }
@@ -2760,7 +2993,12 @@ document.addEventListener("click",ev=>{
     case "pl-propose": proponi(ing.plan); planEdited(); break;
     case "pl-rebuild": costruisciPiano(); ingestPreview(); break;
     case "rm-person": { const t=taskById(id); setPersone(t,r=>r.filter(x=>x!==b.dataset.name)); dopoModifica(`${b.dataset.name} tolto dalla tratta`); break; }
-    case "stima-trasporto": { const t=taskById(id), o=ord(t.oid); apriDialogStima(o,t.leg); break; }
+    case "stima-trasporto": apriDialogStima(taskById(id)); break;
+    case "affida-esterno": { const t=taskById(id), n=b.dataset.name; closeDlg(b.closest("dialog"));
+      setMezzi(t,()=>[]); legMezzoTasks(ord(t.oid),t.leg==="C"?"A":t.leg).forEach(x=>x.esterno={nome:n,costo:+v});
+      dopoModifica(`Tratta affidata a ${n}`); break; }
+    case "rm-esterno": { const t=taskById(id); legMezzoTasks(ord(t.oid),t.leg==="C"?"A":t.leg).forEach(x=>{delete x.esterno; x.manual=true;});
+      dopoModifica(`${b.dataset.name} tolto dalla tratta`); break; }
     case "nuovo-task-officina": { const o=ord(id), tipo=$("off-tipo").value, desc=$("off-desc").value.trim(), prio=$("off-prio").value, scad=$("off-scad").value, stato=$("off-stato").value;
       const n=aggiungiOfficina(o,tipo,desc,prio,scad,stato); dopoModifica(`Aggiunto ${TIPI[tipo].s.toLowerCase()} a ${o.numero}`); openDrawer(()=>drawerOrdine(o.id)); break; }
     case "crud-new": apriCrudDialog(b.dataset.tipo); break;
@@ -2774,6 +3012,8 @@ document.addEventListener("click",ev=>{
     case "ass-del": { _assTmp.splice(+b.dataset.i,1); renderAssenze(); break; }
     case "ass-goto": aeFlash(+b.dataset.i); break;
     case "ae-tab": aeTab(v); break;
+    case "doc-add": { $("docList").insertAdjacentHTML("beforeend",rigaDoc()); const r=$("docList").lastElementChild; aggiornaDocs(); r.querySelector("select").focus(); break; }
+    case "doc-del": b.closest(".doc-row").remove(); aggiornaDocs(); break;
     case "ae-mese": _ae.mese=+v?addM(_ae.mese,+v):mese1(TODAY); renderAeTimeline(); break;
     case "ass-dialog": apriDialogAssenza(); break;
     case "ass-annulla": closeDlg($("assDlg")); break;
@@ -2786,11 +3026,17 @@ document.addEventListener("click",ev=>{
       const desc=x?.intera===false?`${x.tipo||""} ${x.giorno||""} ${x.dalle||""}–${x.alle||""}`:`${x.tipo||""} ${x.da||""}${x.a&&x.a!==x.da?" → "+x.a:""}`;
       UI.conferma({titolo:"Rimuovere assenza?",testo:`${a.nome}: ${desc}`,ok:"Rimuovi",pericolo:true}).then(ok=>{ if(!ok) return; a.assenze.splice(i,1); render(); }); break; }
     case "export-magazzino": esportaMagazzinoCSV(); break;
-    case "segna-inviato": { state.inviati.add(b.dataset.aid); render(); toast("Alert segnato come inviato"); break; }
-    case "invia-whatsapp": { const a=alertNotifiche().find(x=>x.id===b.dataset.aid); toast(a?`WhatsApp: ${a.testo}`:"Messaggio non trovato"); break; }
-    case "carica-rapportini": { const f=$("rapportiniFile")?.files?.[0]; if(f){ toast(`Caricato ${f.name} (simulato)`); }
-      else { RAPPORTINI=ADDETTI.map(a=>({persona:a.nome,data:dkey(state.date),orePianificate:Math.round(oreSettimana(a.nome,state.date)*4)/4,oreEffettive:Math.round((oreSettimana(a.nome,state.date)+(Math.random()-.5))*4)/4,oreFatturate:Math.round(oreSettimana(a.nome,state.date)*4)/4})); toast("Generati rapportini dimostrativi"); }
-      render(); break; }
+    case "prom-add": { const f=b.closest(".prom-new"), testo=f.querySelector(".pn-testo").value.trim(), q=f.querySelector(".pn-quando").value, o=ord(id||f.querySelector(".pn-oid")?.value||"");
+      if(!testo||!q){ toast("Scrivi cosa fare e entro quando.","warn"); break; }
+      (o?(o.prom||=[]):PROMEMORIA).push({id:"p"+(++PID),testo,quando:q,fatto:false});
+      dopoModifica(`Promemoria${o?" su "+o.numero:""}: ${testo}`); break; }
+    case "prom-fatto": case "prom-del": { const p=promemoria().find(x=>x.id===b.dataset.pid); if(!p) break; const o=p.oid&&ord(p.oid), lista=o?o.prom:PROMEMORIA;
+      if(b.dataset.act==="prom-del") lista.splice(lista.findIndex(x=>x.id===p.id),1);
+      else if(p.auto){ const k=p.id.split("|")[1]; o.promFatti=p.fatto?o.promFatti.filter(x=>x!==k):[...(o.promFatti||[]),k]; }
+      else { const x=lista.find(x=>x.id===p.id); x.fatto=!x.fatto; }
+      dopoModifica(`Promemoria ${b.dataset.act==="prom-del"?"eliminato":p.fatto?"riaperto":"fatto"}: ${p.testo}`); break; }
+    case "cart-demo": cartelliniDemo(); break;
+    case "cart-svuota": CARTELLINI=[]; render(); break;
     case "csv": esportaCSV(); break;
     case "print": window.print(); break;
     case "ingest": ing.step=0; ing.plan=null; ingestRender(); showDlg($("ingest")); break;
@@ -2869,6 +3115,9 @@ document.addEventListener("wheel",ev=>{
 },{passive:false});
 document.addEventListener("change",ev=>{
   const el=ev.target;
+  if(el.id==="cartFile"&&el.files.length){ importaCartellini([...el.files]); el.value=""; }
+  if(el.id==="cmese"&&el.value){ state.cmese=el.value; render(); }
+  if(el.dataset.abbina!==undefined&&el.value){ const n=el.dataset.abbina, a=ADD[el.value]; a.cartellino=n; CARTELLINI.forEach(c=>{ if(c.nominativo===n) c.persona=a.nome; }); toast(`«${n}» abbinato a ${a.nome}`); render(); }
   if(el.id==="addSel"&&el.value){ const t=taskById(el.dataset.id), n=el.value; setPersone(t,r=>[...r,n]); dopoModifica(`${n} aggiunto alla tratta`); }
   if(el.id==="mezzoAdd"&&el.value){ const t=taskById(el.dataset.id), n=el.value; setMezzi(t,ms=>[...ms,n]); dopoModifica(`${n} aggiunto alla tratta`); }
   if(el.dataset.pl) planChange(el);
@@ -2880,6 +3129,7 @@ document.addEventListener("change",ev=>{
     else { x[f]=el.value; if(f==="da"&&el.value&&(!x.a||x.a<x.da)){ x.a=x.da; const a=el.parentNode.querySelector('[data-ass="a"]'); if(a) a.value=x.a; } aggiornaMeta(); } }
   if(el.name==="c-tipo") $("c-coop-w").hidden=el.value!=="cooperativa";
   if(el.dataset.scad) aggiornaScad();
+  if(el.dataset.doc) aggiornaDocs();
   if(el.id==="c-tipo"&&_ae.c===DISP.mezzi) renderAssenze();
   if(el.id==="ass-modo") assModo();
   if(el.dataset.sort){ state.sort=el.value; render(); }
@@ -2979,6 +3229,12 @@ state.ordini.push(nuovoOrdine({numero:"2026-2301 V1",resp:"Olivia",cliente:"Hote
   legTasks(o("2026-2280 V1"),"A").forEach(t=>t.risorse=[...t.risorse.slice(0,-1),"Marco Bianchi"]); // in ferie dal 2 al 6/11
   legTasks(o("2026-2284 V2"),"A").forEach(t=>t.risorse=[...t.risorse.slice(0,-1),"Elena Greco"]);   // permesso 14–18 il 4/11
 })();
+/* promemoria di esempio: un trasporto affidato all'esterno (regola delle 48 h) e due promemoria scritti a mano */
+(()=>{ const o=n=>state.ordini.find(x=>x.numero===n), a=o("2026-2241 V1"), f=o("2026-2255 V2");
+  if(a) legMezzoTasks(a,"A").forEach(t=>{t.mezzi=[]; t.esterno={nome:"Noleggi Rapidi SRL",costo:250};});
+  if(f) f.prom=[{id:"p"+(++PID),testo:"Chiama il referente per l'accesso al padiglione e il montacarichi",quando:"2026-10-27T10:00",fatto:false}];
+  PROMEMORIA.push({id:"p"+(++PID),testo:"Ordina nastro e scatole per gli imballi",quando:"2026-10-20T11:00",fatto:false});
+})();
 state.date=TODAY;  // si apre sul foglio di oggi; entrando in Pianificazione la data si riposiziona con ancora()
 
 /* ============================================================
@@ -2991,7 +3247,7 @@ const AIUTI={
   "vista-ordini":"<b>Ordini</b>: elenco delle offerte importate. Cerca, filtra per stato e servizio, ordina per colonna. Clicca una riga per aprire il dettaglio dell'ordine con il piano dei micro-task.",
   "vista-risorse":"<b>Risorse e anagrafiche</b>: tutto ciò che alimenta il piano — addetti (con ruoli, patenti e certificazioni), mezzi, squadre, trasportatori, articoli, zone ZTL, micro-task/formule e le tabelle di lookup. Qui si creano e modificano le entità con i pulsanti «Nuovo» e «Modifica/Elimina».",
   "vista-magazzino":"<b>Magazzino</b>: i report cartacei del giorno scelto, uno per ordine. «Da preparare per domani» elenca, per i carichi del giorno dopo, gli articoli da preparare e caricare, con le persone e il mezzo schedulati; «Rientri attesi» elenca cosa deve tornare, con le colonne da compilare (rientrati, danneggiati, mancanti). Cambia giorno con le frecce in alto, poi «Stampa».",
-  "vista-notifiche":"<b>Notifiche & ore</b>: gli alert pendenti (conferme motrice, autorizzazioni ZTL, mock WhatsApp) e la riconciliazione delle ore pianificate/effettive/fatturate.",
+  "vista-notifiche":"<b>Notifiche & ore</b>: i promemoria del pianificatore (automatici: trasportatore esterno 48 h prima, permesso ZTL, motrice; o scritti a mano) ; i cartellini delle cooperative (import .xlsx) confrontati con il piano, giorno per giorno, e il consuntivo del mese per persona, cooperativa e ordine, con le tariffe di Risorse › Cooperative.",
   "vista-componenti":"<b>Componenti</b>: catalogo dal vivo della libreria UI (window.UI). Serve a chi sviluppa o configura l'interfaccia: ogni blocco è riusato dalle schermate dell'applicazione.",
   "seq-ordine":"<b>Sequenza micro-task</b>: tutti i micro-task dell'ordine in ordine cronologico. Clicca una tappa per aprire il dettaglio di quel task. La tappa evidenziata è quella corrente; il pallino rosso segnala un conflitto.",
   "questo-task":"<b>Questo micro-task</b>: i dati del task selezionato — inizio, durata e nota. Modificando inizio o durata, i micro-task successivi della stessa tratta scorrono di conseguenza. Il motivo della durata stimata è nel riquadro pieghevole.",

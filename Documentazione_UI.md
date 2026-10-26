@@ -18,7 +18,7 @@ La navigazione è sulla colonna di sinistra. Ogni voce apre una vista; il titolo
 | **Ordini** | Elenco delle offerte importate | Cerca, filtra e apre il dettaglio di un ordine |
 | **Risorse** | Addetti, mezzi, squadre, trasportatori, articoli, zone ZTL, micro-task/formule, tabelle di lookup | Anagrafiche: qui si creano e modificano le entità che alimentano il piano |
 | **Magazzino** | Report da stampare, una scheda per ordine: «Da preparare per domani» e «Rientri attesi» | Preparare e caricare la merce, controllare cosa rientra; stampa ed esporta CSV |
-| **Notifiche & ore** | Alert pendenti e riconciliazione ore | Tiene sotto controllo conferme (motrice, ZTL) e scostamenti ore |
+| **Notifiche & ore** | Promemoria del pianificatore; cartellini delle cooperative e consuntivo del mese | Le cose da fare per gestire gli ordini (prenotare trasportatori, permessi ZTL, conferme); confronto cartellini ↔ piano e costo delle cooperative |
 | **Componenti** | Catalogo dal vivo della libreria UI | Strumento per chi sviluppa/configura l'interfaccia |
 
 ---

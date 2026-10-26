@@ -27,6 +27,12 @@ Lavoro dei giorni 25–26/10. Le voci 13, 15 e 16 della tabella del 25/10 sono s
 | 10 | **Zoom nei dialog** | Ctrl + rotella dentro un dialog non zooma più la Pianificazione sottostante. |
 | 11 | **Dati dimostrativi su 20 giorni** | 20/10 – 08/11, con un caso per ogni avviso (elenco e date nella guida `Guida_Prototipo.md`). Assenze e fermi sono inseriti prima delle proposte, alcune assegnazioni sbagliate sono volute. |
 | 12 | **Offerte anonimizzate per la demo pubblica** | `Estrazione/anonimizza.py` crea `Prototipo/assets/offerte-demo/`: nei PDF cliente, referenti, contatti, P.IVA, IBAN e prezzi sono redatti davvero (testo rimosso), nell'indice sostituiti da nomi di fantasia. Il prototipo usa `assets/offerte/` se c'è (locale) altrimenti `offerte-demo/` (GitHub Pages). |
+| 13 | **Tratta affidata a un trasportatore esterno** | Dal dettaglio della tratta, «Stima costo trasportatore» elenca i trasportatori compatibili con la ZTL e il costo stimato; **«Affida»** assegna la tratta (andata o ritiro) al trasportatore: i mezzi interni vengono tolti, il trasportatore compare come risorsa «esterno» con il costo, l'avviso «senza mezzo» sparisce, «Mezzi andata» mostra il suo nome, il carico segue l'andata. La × lo toglie; «Ripristina proposta» torna ai mezzi interni. Campo `esterno {nome, costo}` sui task che usano il mezzo. Sulle tratte affidate non si controllano patente, ZTL e sovrapposizioni (il mezzo è del trasportatore). |
+| 14 | **Documenti dell'addetto con scadenza** | Nuova scheda **Documenti** nel dialog addetto: righe libere (tipo, numero/note, scadenza), anche più dello stesso tipo, con stato accanto alla data e conteggio sulla linguetta. Tipi (lookup `DOC_TIPI`): carta d'identità, permesso di soggiorno, patente di guida, CQC merci, carta tachigrafica, idoneità sanitaria, formazione sicurezza (D.Lgs. 81/08), abilitazione carrelli elevatori, abilitazione PLE, lavori in quota / DPI 3ª cat., primo soccorso, antincendio, preposto, altro. Colonna **Documenti** nell'elenco addetti. Entrano negli avvisi (§6). |
+| 15 | **Cartellini delle cooperative e consuntivo del mese** | Sostituisce la «Riconciliazione ore» dimostrativa (Notifiche & ore › *Cartellini e consuntivo*). **Import** dei cartellini `.xlsx` del sistema presenze della cooperativa (es. Konnekta): un file per persona e mese, colonne Data, Nominativo, Area (= cooperativa), fino a 4 coppie E/U, Nota, Commento, Totale. Si possono caricare più file insieme; reimportando, i giorni già presenti si sostituiscono (mese parziale). Le ore si ricalcolano dalle timbrature (uscita a 00:00 o prima dell'entrata = dopo mezzanotte) e si confrontano con il totale del file. **Abbinamento** all'addetto per «Nome nel cartellino» o per nome e cognome in qualsiasi ordine (`BETTINESCHI2 JORDIE` = `Jordie Bettineschi`); se non trova, l'operatore sceglie l'addetto e l'abbinamento resta salvato. **Confronto giornaliero** cartellino ↔ piano (le ore pianificate valgono come effettive finché non c'è la chiusura giornaliera), tolleranza ±30 min: in linea, più/meno ore del piano, non in piano, in piano ma non timbrato, malattia (dal commento), trasferta non in piano (commento `trasf` senza tratte fuori sede). **Consuntivo** per persona (ordinarie, straordinarie oltre la soglia giornaliera, notturne 22–6, festive, giorni di trasferta, costo), per cooperativa e per ordine (ore e costo di ogni giorno ripartiti sugli ordini in proporzione alle ore di piano). Segnalati i cartellini mancanti di chi era in piano. «Malattia, era in piano», «in piano, non timbrato» e totale diverso dal file entrano negli avvisi (categoria Cartellino). Solo addetti di cooperativa: gli interni hanno un altro sistema e per ora non servono. |
+| 16 | **Anagrafica Cooperative** | Risorse › *Cooperative*: nome (uguale alla colonna Area del cartellino), tariffe €/h ordinaria, straordinario, maggiorazione notturna, festivo, trasferta €/giorno, soglia dello straordinario (h/giorno). Straordinario e festivo sostituiscono l'ordinaria, il notturno si somma. Nell'addetto la cooperativa si sceglie dall'elenco. Tariffe del prototipo di esempio. |
+| 17 | **Colonna ore dell'elenco addetti** | «Carico settimana» diventa «Ore pianificate gg/mm–gg/mm»: la settimana è quella della data selezionata. |
+| 18 | **Promemoria del pianificatore** | Sostituiscono gli «Alert» di Notifiche (tolti «Segna come inviato» e il finto invio WhatsApp). Un promemoria è una cosa da fare per chi pianifica, con scadenza: **automatico** da regole (`REGOLE_PROM`: prenotare il trasportatore esterno 48 h prima della partenza della tratta affidata, permesso ZTL 72 h prima della consegna, conferma motrice 48 h prima) o **scritto a mano**, sull'ordine (`o.prom`) o generale. Stato: scaduto, entro 24 h, in programma, fatto. Si vedono nella riga **«Da fare · pianificatore»** in cima al Gantt e come rombo sulla riga dell'ordine, nella scheda **Da fare** del Foglio del giorno (del giorno, più gli scaduti aperti se è oggi), in Notifiche › **Promemoria** (scaduti, 7 giorni, più avanti, fatti), nel riquadro Promemoria del dettaglio ordine e negli avvisi (scaduto = media, entro 24 h = bassa). «Fatto» / «Riapri»; quelli dell'ordine passano dal registro modifiche e si annullano. |
 
 ### Catalogo prodotti: app della stessa suite
 
@@ -271,7 +277,10 @@ Ogni micro-task appartiene a una tratta; squadra e mezzi si assegnano per tratta
 | ALTRO | Attività personalizzata | no | sì |
 
 ### 3.4 Anagrafiche
-- **Addetto**: nome, ruolo (Autista, Capo squadra, Montatore, Magazziniere), patenti (B, C, CE; nessuna = non guida), abilitazioni (muletto, carrello), turno, assenze `{tipo, da, a}`.
+- **Addetto**: nome, ruolo (Autista, Capo squadra, Montatore, Magazziniere), patenti (B, C, CE; nessuna = non guida), abilitazioni (muletto, carrello), turno, assenze `{tipo, da, a}`, documenti `docs: [{tipo, num, scadenza}]` (§0 n.14), `cartellino` (nome nel cartellino presenze).
+- **Promemoria**: `{id, testo, quando, fatto}`; sull'ordine in `o.prom`, generali a parte. Gli automatici non si salvano: si calcolano dalle regole, l'ordine tiene solo `promFatti` (chiavi delle regole già fatte) (§0 n.18).
+- **Cooperativa**: nome, `tariffe {ord, stra, notte, fest, trasf}`, `soglia` (h/giorno oltre cui è straordinario) (§0 n.16).
+- **Cartellino** (importato): `{nominativo, area, persona, data, turni: [[entrata, uscita]], commento, totFile, file}`, una riga per persona e giorno (§0 n.15).
 - **Mezzo**: nome, tipo, volume utile (m³), portata (kg), patente richiesta, classe Euro, massa (t), lunghezza (m), `fermi` (stesso formato delle assenze, con tipo di fermo), `scadenze` {revisione, assicurazione, bollo, tagliando}. Lo `stato` è calcolato dai fermi (§0 n.5). Corriere esterno a parte: preavviso 48 h, costo indicativo.
 - **Zona ZTL**: nome, città, Euro minima, massa e lunghezza massime, fascia attiva, permesso richiesto, fonte. *I valori nel prototipo sono indicativi e vanno verificati.*
 - **Articolo**: codice, descrizione, categoria, volume, peso, ore·persona di carico e di allestimento per pezzo. *Sospeso: vedi §7.*
@@ -348,11 +357,15 @@ Gli avvisi non bloccano mai: segnalano. Severità: **alta** = da risolvere, **me
 |---|---|---|
 | Sovrapposizione | alta | la stessa persona o lo stesso mezzo su due ordini contemporanei |
 | Assenza | alta | addetto assegnato in un giorno di ferie/riposo |
+| Documenti | alta | addetto assegnato a una tratta con un documento già scaduto alla data della tratta (fa pulsare i task) |
+| Documenti | alta / media | documento dell'addetto scaduto / in scadenza entro 30 giorni |
+| Promemoria | media / bassa | promemoria del pianificatore scaduto / in scadenza entro 24 h (§0 n.18) |
+| Cartellino | media | malattia in un giorno in piano, in piano ma non timbrato, totale del file diverso dalle timbrature (§0 n.15) |
 | Mezzo | alta | mezzo in manutenzione |
 | Capacità | alta | somma dei volumi dei mezzi < volume dell'ordine — **disattivato** finché l'anagrafica articoli è sospesa |
 | Patente | alta | non ci sono abbastanza autisti abilitati distinti per i mezzi della tratta |
 | Assegnazione | media | tratta senza squadra |
-| Mezzo | media | tratta senza mezzo (tutti impegnati o in manutenzione: suggerisce il corriere) |
+| Mezzo | media | tratta senza mezzo e non affidata a un trasportatore esterno (suggerisce il trasportatore più economico) |
 | ZTL | media | mezzo non ammesso nella zona della location (Euro, massa, lunghezza) |
 | Turni | media | giornata di lavoro > 10 h per un addetto |
 | Turni | media | riposo < 11 h tra la fine di un giorno e la ripresa |
@@ -503,5 +516,12 @@ PDF Offerte/*.pdf
 | 7 | Avvisi dalle scadenze dei mezzi | Es. mezzo con revisione scaduta assegnato a una tratta. |
 | 8 | Catalogo prodotti, poi magazzino con impegno degli articoli | Disponibilità per data; prima il catalogo. |
 | 9 | Officina | Manutenzione e sistemazione degli articoli noleggiati rientrati danneggiati (dai report dei rientri). |
+| 12 | Allegare il file ai documenti dell'addetto | PDF o scansione accanto alla scadenza. |
+| 13 | Costo dei trasportatori esterni nei consuntivi | Oggi il costo stimato resta sulla tratta. |
+| 14 | **Chiusura giornaliera** | Ore reali per tratta (chi c'era, inizio e fine) confermate a fine giornata; oggi il consuntivo usa il piano come effettivo (§0 n.15). |
+| 15 | Pausa pranzo nel piano | Oggi il confronto con il cartellino la assorbe nella tolleranza. |
+| 16 | Tariffe per ruolo, fasce notturne e calendario festivi delle cooperative | Oggi una tariffa per cooperativa, notte 22–6, festivi fissi. |
+| 17 | Regole dei promemoria configurabili | Oggi tre regole con anticipo fisso nel codice: da portare nella pagina di configurazione (backlog n.1). |
+| 18 | Notifiche esterne dei promemoria | E-mail o messaggio al pianificatore quando si avvicina la scadenza (il finto WhatsApp è stato tolto). |
 | 10 | «Rifai» nel registro modifiche | Ctrl+Y, autore della modifica. |
 | 11 | Nomi di fantasia nei dati dimostrativi | Oggi i clienti dei dati di esempio sono reali. |
