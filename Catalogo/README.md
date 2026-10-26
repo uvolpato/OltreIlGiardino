@@ -9,7 +9,7 @@ Prototipo separato dalla Logistica per l'anagrafica articoli. Specifiche: `../PR
 python Catalogo/converti.py   # Excel -> Prototipo-Catalogo/assets/articoli.js
 python Catalogo/build.py           # app.js + catalogo.css + stile della Logistica -> Prototipo-Catalogo/index.html
 ```
-Si modifica `Catalogo/app.js` e `Catalogo/catalogo.css`, poi si rilancia `build.py`. Lo stile base (token, pulsanti, tabelle, pannelli) è copiato dal prototipo Logistica, così le due sezioni restano uguali.
+Si modifica `Catalogo/app.js` e `Catalogo/catalogo.css`, poi si rilancia `build.py`. Dal prototipo Logistica (che non si modifica) build.py copia lo stile e la libreria dei componenti (UI: pannelli, tabelle, datatable, filtri, conferme, toast, aiuti), così le due app della suite restano uguali. `python Catalogo/pubblica.py` genera la copia del listino senza fornitori e prezzi usata su GitHub Pages.
 
 ## Cosa c'è
 | Vista | Ruoli | Contenuto |
