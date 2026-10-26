@@ -47,7 +47,19 @@ const state={view:"catalogo",ruolo:DB.ruolo||null,dt:{},sel:null,mob:{step:0},vi
 
 /* articoli: dati origine + modifiche locali + nuovi censiti */
 const ARTICOLI=()=>[...CAT.articoli,...DB.nuovi];
-const conOv=a=>({...a,...(DB.ov[a.c]||{})});
+/* il catalogo è la fonte dei dati (anche per l'ERP): dai campi del file si ricava il modello completo
+   - forn: fornitori dell'articolo [{nome, codice, acquisto, condizioni, principale}] (molti-a-molti)
+   - prezzi: {acquisto, vendita, noleggio}; costi: storico [{data, tipo:"produzione"|"riacquisto", importo, fornitore, nota}]
+   - tipo: "finito" (si noleggia da solo) | "componente" (parte di altri articoli, es. anima o rivestimento)
+   - giacenza: giacenza fisica contata a mano, giacenzaIl: data dell'ultimo conteggio */
+const COMPONENTE_RX=/copertur|fodera|rivestiment|struttura |anima |imbottitur|ricambio/i;
+const conOv=a=>{ const x={...a,...(DB.ov[a.c]||{})};
+  x.forn??=[a.f&&{nome:a.f,principale:true},a.f2&&{nome:a.f2}].filter(Boolean);
+  x.prezzi??={acquisto:null,vendita:a.pv??null,noleggio:a.pn??null};
+  x.costi??=[]; x.tipo??=(COMPONENTE_RX.test(a.d)?"componente":"finito");
+  return x; };
+/* foto collegate a un codice diverso da quello dell'articolo (errore di mappatura nel file) */
+const fotoFuori=a=>(a.foto||[]).filter(f=>!f.toUpperCase().startsWith(a.c.toUpperCase()+"_"));
 const art=c=>{const a=CAT.articoli.find(x=>x.c===c)||DB.nuovi.find(x=>x.c===c); return a?conOv(a):null;};
 const setArt=(c,patch,nota)=>{const prev=DB.ov[c]||{}; DB.ov[c]={...prev,...patch,storico:[...(prev.storico||[]),{q:oggi(),chi:RUOLO_N[state.ruolo]||"—",n:nota||Object.keys(patch).join(", ")}]}; save();};
 const gruppi=()=>{const m=new Map(); ARTICOLI().forEach(a0=>{const a=conOv(a0); if(!m.has(a.b)) m.set(a.b,[]); m.get(a.b).push(a);}); return [...m.values()];};
@@ -55,7 +67,7 @@ const gruppi=()=>{const m=new Map(); ARTICOLI().forEach(a0=>{const a=conOv(a0); 
 /* completezza della scheda (§6 del PRD) */
 const CHECK=[["foto","Foto principale",a=>a.foto?.length||a.fotoNuove?.length],["desc","Descrizione estesa",a=>(a.e||"").length>20],
   ["dim","Dimensioni strutturate",a=>a.L||a.D],["log","Volume e peso da imballato",a=>a.vol&&a.peso],["rgb","Colori RGB",a=>a.rgb?.length],
-  ["temi","Almeno un tema",a=>a.temi?.length],["funz","Funzione",a=>a.funz?.length]];
+  ["temi","Almeno un tema",a=>a.temi?.length],["funz","Funzione",a=>a.funz?.length],["prezzo","Prezzo di noleggio",a=>a.tipo==="componente"||a.prezzi?.noleggio!=null]];
 const compl=a=>CHECK.filter(([,,f])=>f(a)).length/CHECK.length;
 const statoArt=a=>a.stato==="revisione"?["Da revisionare","warn"]:a.stato==="pubblicato"?["Pubblicato","ok"]:compl(a)===1?["Completo","info"]:["Da completare",""];
 const STATI=["Da completare","Da revisionare","Completo","Pubblicato"];
@@ -108,7 +120,14 @@ function topActions(){
   if(state.view==="catalogo"&&VISIBILI[state.ruolo].includes("censimento")) a.push(`<button class="btn btn-primary" data-act="view" data-v="censimento">${icon("cam",16)} Censisci</button>`);
   return a.join("");
 }
+/* un campo che perde il focus mentre la pagina si ridisegna genera un «change» e un secondo render annidato:
+   lo si rimanda a dopo il primo */
+let _rendering=false, _ancora=false;
 function render(){
+  if(_rendering){ _ancora=true; return; }
+  _rendering=true; try{ disegna(); } finally{ _rendering=false; if(_ancora){ _ancora=false; render(); } }
+}
+function disegna(){
   document.body.classList.toggle("no-auth",!state.ruolo);
   if(!state.ruolo){ $("login").innerHTML=viewAccesso(); return; }
   $("login").innerHTML="";
@@ -126,17 +145,30 @@ function render(){
 }
 
 /* ---------- CATALOGO ---------- */
-const testoGruppo=g=>g.map(x=>[x.c,x.d,x.t,x.e,x.k1,x.k2,x.k3,x.f,nomeColore(x.cc),(x.temi||[]).join(" "),(x.stili||[]).join(" ")].join(" ")).join(" ");
-const CAMPI_CAT={st:g=>g.map(x=>statoArt(x)[0]),k1:g=>g[0].k1,col:g=>g.map(x=>famColore(x.cc))};
+const testoGruppo=g=>g.map(x=>[x.c,x.d,x.t,x.e,x.k1,x.k2,x.k3,(x.forn||[]).map(f=>f.nome).join(" "),nomeColore(x.cc),(x.temi||[]).join(" "),(x.stili||[]).join(" ")].join(" ")).join(" ");
+const CAMPI_CAT={st:g=>g.map(x=>statoArt(x)[0]),k1:g=>g[0].k1,k2:g=>g[0].k2,tipo:g=>g[0].tipo,col:g=>g.map(x=>famColore(x.cc))};
+/* ordine delle categorie: prima quelle messe in testa dal curatore (nell'ordine scelto), poi alfabetico */
+const ordCat=lista=>{const pin=DB.catOrd||[]; return [...lista].sort((a,b)=>{const i=pin.indexOf(a), j=pin.indexOf(b); return i>=0||j>=0?(i<0?1e9:i)-(j<0?1e9:j):a.localeCompare(b,"it");});};
+/* senza ricerca si naviga a due livelli: prima la categoria, poi la sottocategoria, solo allora i prodotti */
+function navCategorie(tutti,st){
+  const k1=st.seg.k1, cur=state.ruolo==="curatore", pin=DB.catOrd||[];
+  const conta=f=>tutti.filter(f).length;
+  const voci=k1?ordCat(classi2(k1)).map(k2=>[k2,conta(g=>g[0].k1===k1&&g[0].k2===k2),"k2"]).filter(x=>x[1]):ordCat(CLASSI1).map(k=>[k,conta(g=>g[0].k1===k),"k1"]);
+  const tile=([n,q,liv])=>`<div class="cat-t"><button class="pc cat-b" data-act="dt-seg" data-dt="cat" data-g="${liv}" data-v="${esc(n)}"><div class="pc-b"><div class="pc-t">${esc(cap(n))}</div><span class="small muted">${num(q,0)} ${q===1?"modello":"modelli"}</span></div></button>
+    ${cur&&liv==="k1"?`<button class="icon-btn cat-pin${pin.includes(n)?" on":""}" data-act="cat-pin" data-v="${esc(n)}" aria-label="${pin.includes(n)?"Togli dalla testa":"Metti in testa"}: ${esc(cap(n))}" title="${pin.includes(n)?"In testa all'elenco: clicca per tornare in ordine alfabetico":"Metti in testa all'elenco"}">★</button>`:""}</div>`;
+  return `<div class="pgrid cat-grid">${voci.map(tile).join("")}</div>`;
+}
+const briciole=st=>`<nav class="crumbs" aria-label="Percorso"><button class="btn btn-sm btn-ghost" data-act="cat-nav" data-v="">Tutte le categorie</button>${st.seg.k1?` › <button class="btn btn-sm btn-ghost" data-act="cat-nav" data-v="k1">${esc(cap(st.seg.k1))}</button>`:""}${st.seg.k2?` › <strong>${esc(cap(st.seg.k2))}</strong>`:""}${st.q?` · <span class="muted">risultati della ricerca in ${st.seg.k2?"questa sottocategoria":st.seg.k1?"questa categoria":"tutto il catalogo"}</span>`:""}</nav>`;
 function viewCatalogo(){
-  const tutti=gruppi(), list=UI.filtra("cat",tutti,testoGruppo,CAMPI_CAT), st=dtStato("cat"), cnt=(g,v)=>UI.conta("cat",tutti,testoGruppo,CAMPI_CAT,g,v);
-  const filtri=UI.filtri({id:"cat",cerca:"Cerca codice, descrizione, fornitore, tema…",segmenti:[
+  const tutti=gruppi(), list=UI.filtra("cat",tutti,testoGruppo,CAMPI_CAT).sort((a,b)=>a[0].b.localeCompare(b[0].b)), st=dtStato("cat"), cnt=(g,v)=>UI.conta("cat",tutti,testoGruppo,CAMPI_CAT,g,v);
+  const naviga=!st.q&&!st.seg.k2;
+  const filtri=naviga?UI.filtri({id:"cat",cerca:"Cerca in tutto il catalogo: codice, descrizione, fornitore, tema…"}):UI.filtri({id:"cat",cerca:"Cerca codice, descrizione, fornitore, tema…",segmenti:[
       {nome:"st",etichetta:"Stato",voci:[["","Tutti",cnt("st")],...STATI.map(s=>[s,s,cnt("st",s)])]},
-      {nome:"k1",etichetta:"Classe",voci:[["","Tutte"],...CLASSI1.map(k=>[k,cap(k),cnt("k1",k)])]}]})
-    +`<div class="row wrap colfil" role="group" aria-label="Colore"><span class="tiny muted">Colore</span>${Object.entries(FAMCOL).map(([f,h])=>`<button class="swb${st.seg.col===f?" on":""}" data-act="dt-seg" data-dt="cat" data-g="col" data-v="${st.seg.col===f?"":f}" title="${f}" aria-pressed="${st.seg.col===f}">${sw(h,f)}</button>`).join("")}</div>`;
+      {nome:"tipo",etichetta:"Tipo",voci:[["","Tutti"],["finito","Articoli finiti",cnt("tipo","finito")],["componente","Componenti",cnt("tipo","componente")]]}]})
+    +(naviga?"":`<div class="row wrap colfil" role="group" aria-label="Colore"><span class="tiny muted">Colore</span>${Object.entries(FAMCOL).map(([f,h])=>`<button class="swb${st.seg.col===f?" on":""}" data-act="dt-seg" data-dt="cat" data-g="col" data-v="${st.seg.col===f?"":f}" title="${f}" aria-pressed="${st.seg.col===f}">${sw(h,f)}</button>`).join("")}</div>`);
   const vista=`<div class="seg" role="group" aria-label="Vista"><button data-act="vista" data-v="griglia" aria-pressed="${state.vista==="griglia"}">Griglia</button><button data-act="vista" data-v="tabella" aria-pressed="${state.vista==="tabella"}">Tabella</button></div>`;
   /* la datatable tratta gli array come celle: ogni gruppo va incapsulato in {g} */
-  const corpo=state.vista==="tabella"?UI.datatable({id:"cat",righe:list.map(g=>({g})),perPagina:48,vuoto:"Nessun articolo con questi filtri",suggerimento:"Cambia la ricerca o togli i filtri.",
+  const corpo=naviga?navCategorie(tutti,st):state.vista==="tabella"?UI.datatable({id:"cat",righe:list.map(g=>({g})),perPagina:48,ordIniziale:{key:"b",dir:"asc"},vuoto:"Nessun articolo con questi filtri",suggerimento:"Cambia la ricerca o togli i filtri.",
       riga:({g})=>({act:`data-act="apri" data-c="${esc(g[0].c)}"`}),colonne:[
       {key:"b",t:"Codice",mono:true,valore:({g})=>g[0].b},{key:"t",t:"Articolo",valore:({g})=>g[0].t||g[0].d,cella:({g})=>`<strong>${esc(g[0].t||g[0].d)}</strong>`},
       {key:"k",t:"Classe",valore:({g})=>g[0].k1+" "+g[0].k2,cella:({g})=>`<span class="small">${esc(cap(g[0].k1))} › ${esc(cap(g[0].k2))}</span>`},
@@ -146,7 +178,7 @@ function viewCatalogo(){
       {key:"st",t:"Stato",tipo:"stato",valore:({g})=>statoArt(g[0])[0],cella:({g})=>UI.stato(...statoArt(g[0]))}]})
     :griglia(list);
   return `<section class="kpis">${UI.kpi(num(ARTICOLI().length,0),"articoli")}${UI.kpi(num(tutti.length,0),"modelli (con varianti)")}${UI.kpi(num(ARTICOLI().filter(a=>compl(conOv(a))===1).length,0),"schede complete",["obiettivo 80%","info"])}${UI.kpi(cnt("st","Da revisionare"),"da revisionare")}</section>
-    ${UI.pannello({titolo:`${num(list.length,0)} modelli`,azioni:vista,aiuto:"vista-catalogo",corpo:`<div class="card-body dt-filtri">${filtri}</div>${corpo}`})}`;
+    ${UI.pannello({titolo:naviga?(st.seg.k1?`${esc(cap(st.seg.k1))}: scegli la sottocategoria`:"Scegli la categoria"):`${num(list.length,0)} modelli`,azioni:naviga?"":vista,aiuto:"vista-catalogo",corpo:`<div class="card-body dt-filtri">${briciole(st)}${filtri}</div>${corpo}`})}`;
 }
 /* griglia a schede: stessa paginazione e stesso piede della datatable (stato in dtStato("cat")) */
 function griglia(list){
@@ -169,8 +201,8 @@ function fillDrawer(kicker,title,html,foot=""){ $("drawerKicker").textContent=ki
 const apri=c=>{ if(!state.drawer) state.atab="scheda"; state.sel=c; openDrawer(drawerArticolo); $("drawerBody").scrollTop=0; };
 /* scheda articolo: a sinistra il riepilogo sempre visibile (foto, stato, varianti, cosa manca),
    a destra una scheda per argomento. Ogni voce di completezza porta alla scheda dove si completa. */
-const SCHEDE_ART=[["scheda","Descrizione"],["uso","Uso negli eventi"],["misure","Misure"],["comp","Composizione"],["foto","Foto e colori"],["info","ERP e storico"]];
-const CHECK_TAB={foto:"foto",desc:"scheda",dim:"misure",log:"misure",rgb:"foto",temi:"uso",funz:"uso"};
+const SCHEDE_ART=[["scheda","Descrizione"],["uso","Uso negli eventi"],["misure","Misure"],["comp","Composizione"],["foto","Foto e colori"],["prezzi","Prezzi e fornitori"],["info","Magazzino e storico"]];
+const CHECK_TAB={prezzo:"prezzi",foto:"foto",desc:"scheda",dim:"misure",log:"misure",rgb:"foto",temi:"uso",funz:"uso"};
 function drawerArticolo(){
   const a=art(state.sel); if(!a) return closeDrawer();
   const g=gruppi().find(x=>x.some(y=>y.c===a.c))||[a], [s,t]=statoArt(a), c=a.c, ro=state.ruolo==="commerciale";
@@ -179,9 +211,12 @@ function drawerArticolo(){
   const f=(k,et,step="any",suff="")=>UI.campo({id:"f-"+k,etichetta:et+(suff?` (${suff})`:""),valore:a[k]??"",tipo:"number",attr:`${at(k)} step="${step}"`});
   const sel=(k,et,op,v)=>`<div><label class="fl" for="f-${k}">${esc(et)}</label><select id="f-${k}" ${at(k)}>${op.map(o=>{const [val,l]=Array.isArray(o)?o:[o,cap(o)]; return `<option value="${esc(val)}"${val===v?" selected":""}>${esc(l)}</option>`;}).join("")}</select></div>`;
 
+  const usatoIn=ARTICOLI().map(conOv).filter(x=>(x.comp||[]).some(k=>k.cod===c));
+  const roP=state.ruolo!=="curatore", disP=roP?" disabled":"";   /* prezzi e fornitori: li modifica il curatore */
+  const eur=v=>v==null||v===""?"—":`€ ${num(v,2)}`;
   /* ---- riepilogo (colonna sinistra) ---- */
   const riep=`<aside class="art-side">${ph(a,"side")}
-    <div class="row wrap" style="gap:4px">${UI.stato(s,t)}${a.dup?UI.stato("codice duplicato","err"):""}${a.nuovo?UI.stato("censito da telefono","info"):""}${a.ai?UI.stato("proposta AI da controllare","warn"):""}</div>
+    <div class="row wrap" style="gap:4px">${UI.stato(s,t)}${UI.stato(a.tipo==="componente"?"Componente":"Articolo finito",a.tipo==="componente"?"info":"")}${a.dup?UI.stato("codice duplicato","err"):""}${fotoFuori(a).length?UI.stato("foto di un altro codice","err"):""}${a.nuovo?UI.stato("censito da telefono","info"):""}${a.ai?UI.stato("proposta AI da controllare","warn"):""}</div>
     ${UI.dettagli([["Codice",`<span class="mono">${esc(c)}</span>`],["Classe",`${esc(cap(a.k1))} › ${esc(cap(a.k2))}${a.k3?` › ${esc(cap(a.k3))}`:""}`],["Colore",a.cc?`${sw(RGB[a.cc]||"#ddd")} ${esc(a.cc)} ${esc(nomeColore(a.cc))}`:"—"],["Misure",esc(a.dim||"—")]])}
     ${g.length>1?`<div><div class="eyebrow">Varianti · ${g.length}</div><div class="var">${g.map(x=>`<button class="vb${x.c===c?" on":""}" data-act="apri" data-c="${esc(x.c)}" title="${esc(x.c)}">${sw(RGB[x.cc]||"#ddd")}<span>${esc(nomeColore(x.cc)||x.cc||x.d)}</span></button>`).join("")}</div></div>`:""}
     <div><div class="row"><span class="eyebrow grow">Scheda completa</span>${UI.misura(Math.round(compl(a)*100),100,"%")}</div>
@@ -189,7 +224,6 @@ function drawerArticolo(){
   </aside>`;
 
   /* ---- contenuto delle schede ---- */
-  const usatoIn=ARTICOLI().map(conOv).filter(x=>(x.comp||[]).some(k=>k.cod===c));
   const pesoComp=(a.comp||[]).reduce((s,k)=>s+((art(k.cod)?.peso||0)*(k.q||1)),0);
   const volAuto=a.L&&a.P&&a.H?a.L*a.P*a.H/1e6:a.D&&a.H?Math.PI*(a.D/2)**2*a.H/1e6:null;
   const corpo={
@@ -197,8 +231,10 @@ function drawerArticolo(){
         ${UI.campo({id:"f-e",etichetta:"Descrizione",valore:a.e,tipo:"textarea",pieno:true,attr:`rows="5" ${at("e")}`})}
         ${UI.campo({id:"f-d",etichetta:`Descrizione breve per l'ERP (${(a.d||"").length}/40)`,valore:a.d,attr:`maxlength="60" ${at("d")}`,pieno:true})}
         ${sel("k1","Classe",CLASSI1,a.k1)}${sel("k2","Sottoclasse",classi2(a.k1),a.k2)}${sel("k3","Tipo",classi3(a.k1,a.k2),a.k3)}
-        ${sel("cc","Colore",Object.entries(CAT.colori).map(([k,n])=>[k,`${k} ${n}`]),a.cc)}</div>
+        ${sel("cc","Colore (scala aziendale)",Object.entries(CAT.colori).map(([k,n])=>[k,`${k} ${n}`]),a.cc)}
+        ${sel("tipo","Tipo articolo",[["finito","Articolo finito (si noleggia da solo)"],["componente","Componente (parte di altri articoli)"]],a.tipo)}</div>
       ${(a.d||"").length>40?UI.nota("La descrizione breve supera i 40 caratteri ammessi dall'ERP."):""}
+      ${a.tipo==="componente"&&!usatoIn.length?UI.nota("È un componente ma non è ancora collegato a nessun articolo: aprilo dall'articolo principale, scheda Composizione."):""}
       <p class="small muted">Materiale (dal codice): ${a.mat?`<span class="mono">${a.mat}</span> ${esc(nomeMateriale(a.mat))}`:"—"}</p>`,
     uso:()=>`<div class="art-uso"><div><label class="fl">Funzione</label>${scelte("funz",FUNZIONI,a.funz||[],c,ro)}</div><div><label class="fl">Temi</label>${scelte("temi",TEMI,a.temi||[],c,ro)}</div>
         <div><label class="fl">Stile</label>${scelte("stili",STILI,a.stili||[],c,ro)}</div><div><label class="fl">Caratteristiche</label>${scelte("attr",ATTR,a.attr||[],c,ro)}</div></div>`,
@@ -216,13 +252,33 @@ function drawerArticolo(){
       ${pesoComp?`<p class="small muted">Peso dai componenti: ${num(pesoComp)} kg</p>`:""}
       ${usatoIn.length?`<p class="small">Usato come componente in: ${usatoIn.map(x=>`<button class="btn btn-sm btn-ghost" data-act="apri" data-c="${esc(x.c)}">${esc(x.d)}</button>`).join(" ")}</p>`:""}`,
     foto:()=>`<div class="fotos">${(a.fotoNuove||[]).map((x,i)=>`<figure class="${x.main?"main":""}"><img src="${x.pres||x.orig}" alt=""><figcaption class="tiny">${esc(x.prompt||"originale")}${x.main?" · principale":""}</figcaption>${ro||x.main?"":`<button class="btn btn-sm btn-ghost" data-act="foto-main" data-c="${esc(c)}" data-i="${i}">Rendi principale</button>`}</figure>`).join("")}
-        ${(a.foto||[]).map((n,i)=>`<figure><div class="ph sm" style="--ph:${RGB[a.cc]||"#ddd"}"></div><figcaption class="tiny mono">${esc(n)}${i===0?" · principale":""}</figcaption></figure>`).join("")||(a.fotoNuove?.length?"":'<p class="small muted">Nessuna foto.</p>')}</div>
+        ${(a.foto||[]).map((n,i)=>`<figure><div class="ph sm" style="--ph:${RGB[a.cc]||"#ddd"}"></div><figcaption class="tiny mono">${esc(n)}${i===0?" · principale":""}${fotoFuori(a).includes(n)?' <span class="t-err">· codice diverso</span>':""}</figcaption></figure>`).join("")||(a.fotoNuove?.length?"":'<p class="small muted">Nessuna foto.</p>')}</div>
       ${ro?"":`<div><button class="btn btn-sm" data-act="foto-da" data-c="${esc(c)}">${icon("cam",15)} Aggiungi foto da telefono</button></div>`}
       <div class="art-grp"><div class="eyebrow">Colori rilevati dalla foto</div>${a.rgb?.length?`<div class="row wrap">${a.rgb.map(x=>`${sw(x.hex,"",true)}<span class="mono tiny">${x.hex} · ${x.pct}%</span>`).join("")}</div><p class="tiny muted">Codice colore più vicino: ${vicino(hex2rgb(a.rgb[0].hex))} ${esc(nomeColore(vicino(hex2rgb(a.rgb[0].hex))))}</p>`:'<p class="small muted">Si calcolano quando si aggiunge una foto.</p>'}</div>
       ${UI.nota("Le foto del file sono indicate per nome: la cartella immagini non è ancora nel progetto.")}`,
-    info:()=>`<div class="art-grp"><div class="eyebrow">Dati commerciali (dall'ERP, sola lettura)</div>${UI.dettagli([["Fornitore",esc(a.f||"—")+(a.f2?` · ${esc(a.f2)}`:"")],["Prezzo noleggio",a.pn!=null?`€ ${num(a.pn,2)}`:"—"],["Prezzo vendita",a.pv!=null?`€ ${num(a.pv,2)}`:"—"],["Unità",esc(a.um)],a.n&&["Note interne",esc(a.n)]])}
-        ${a.pn==null&&a.f==null?UI.nota("Nella versione pubblica fornitori e prezzi sono esclusi."):""}</div>
-      <div class="art-grp"><div class="eyebrow">Codice</div><p class="small"><span class="mono">${esc(c)}</span> — classe ${esc(CODICI1[a.k1]||"?")} · sottoclasse ${esc(CODICI2[a.k1+"|"+a.k2]||"?")} · materiale ${esc(a.mat||"?")} · colore ${esc(a.cc||"?")}</p></div>
+    prezzi:()=>{ const P=a.prezzi||{}, pf=(k,l)=>UI.campo({id:"p-"+k,etichetta:l+" (€)",valore:P[k]??"",tipo:"number",attr:`data-prezzo="${k}" data-c="${esc(c)}" step="0.01" min="0"${disP}`});
+        const marg=P.vendita&&P.acquisto?Math.round((P.vendita-P.acquisto)/P.vendita*100):null;
+        return `<div class="art-grp"><div class="eyebrow">Prezzi</div><div class="fgrid g4">${pf("acquisto","Acquisto")}${pf("vendita","Vendita")}${pf("noleggio","Noleggio")}</div>
+          ${marg!=null?`<p class="small muted">Margine sulla vendita: ${marg}%${P.noleggio&&P.acquisto?` · il noleggio ripaga l'acquisto in ${Math.ceil(P.acquisto/P.noleggio)} noleggi`:""}</p>`:""}</div>
+        <div class="art-grp"><div class="eyebrow">Fornitori · ${(a.forn||[]).length}</div>
+          ${UI.tabella({colonne:[{t:"Fornitore"},{t:"Codice del fornitore",mono:true},{t:"Prezzo d'acquisto",num:true},{t:"Condizioni"},{t:"Principale"},{t:""}],vuoto:"Nessun fornitore.",righe:(a.forn||[]).map((f,i)=>[
+            `<strong>${esc(f.nome)}</strong>`,esc(f.codice||"—"),eur(f.acquisto),`<span class="small">${esc(f.condizioni||"—")}</span>`,
+            f.principale?UI.stato("principale","ok"):roP?"":`<button class="btn btn-sm btn-ghost" data-act="forn-main" data-c="${esc(c)}" data-i="${i}">Rendi principale</button>`,
+            roP?"":`<button class="icon-btn" data-act="forn-del" data-c="${esc(c)}" data-i="${i}" aria-label="Togli ${esc(f.nome)}">${icon("x",13)}</button>`])})}
+          ${roP?"":`<div class="addc"><input id="nf-nome" placeholder="Fornitore" list="nf-list" aria-label="Fornitore"><datalist id="nf-list">${FORNITORI().map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+            <input id="nf-cod" placeholder="Suo codice" style="width:130px" aria-label="Codice del fornitore"><input id="nf-pr" type="number" step="0.01" min="0" placeholder="€ acquisto" style="width:110px" aria-label="Prezzo d'acquisto">
+            <input id="nf-cond" placeholder="Condizioni (es. 15 gg, minimo 10 pz)" aria-label="Condizioni"><button class="btn btn-sm" data-act="forn-add" data-c="${esc(c)}">+ Aggiungi</button></div>`}</div>
+        <div class="art-grp"><div class="eyebrow">Storico costi di produzione e di riacquisto · ${(a.costi||[]).length}</div>
+          ${UI.tabella({colonne:[{t:"Data",mono:true},{t:"Tipo"},{t:"Importo",num:true},{t:"Fornitore"},{t:"Nota"}],vuoto:"Nessun costo registrato.",righe:(a.costi||[]).slice().sort((x,y)=>y.data.localeCompare(x.data)).map(k=>[esc(k.data),UI.stato(k.tipo==="produzione"?"Produzione":"Riacquisto",k.tipo==="produzione"?"info":""),eur(k.importo),esc(k.fornitore||"—"),`<span class="small">${esc(k.nota||"")}</span>`])})}
+          ${roP?"":`<div class="addc"><input id="nk-data" type="date" value="${new Date().toISOString().slice(0,10)}" aria-label="Data"><select id="nk-tipo" aria-label="Tipo"><option value="riacquisto">Riacquisto</option><option value="produzione">Produzione</option></select>
+            <input id="nk-imp" type="number" step="0.01" min="0" placeholder="€" style="width:100px" aria-label="Importo"><select id="nk-forn" aria-label="Fornitore"><option value="">—</option>${(a.forn||[]).map(f=>`<option>${esc(f.nome)}</option>`).join("")}</select>
+            <input id="nk-nota" placeholder="Nota" aria-label="Nota"><button class="btn btn-sm" data-act="costo-add" data-c="${esc(c)}">+ Registra</button></div>`}</div>
+        ${a.f==null&&a.pn==null&&!(a.forn||[]).length?UI.nota("Nella versione pubblica fornitori e prezzi del file sono esclusi."):""}`; },
+    info:()=>`<div class="art-grp"><div class="eyebrow">Giacenza</div><div class="fgrid g4">${f("giacenza","Giacenza fisica","1","pz")}</div>
+        <p class="small muted">${a.giacenzaIl?`Ultimo conteggio: ${esc(a.giacenzaIl)}`:"Mai contata: va allineata articolo per articolo prima del nuovo magazzino."}</p>
+        ${ro||a.giacenza==null?"":`<div><button class="btn btn-sm" data-act="giac-ok" data-c="${esc(c)}">Conferma il conteggio di oggi</button></div>`}</div>
+      <div class="art-grp"><div class="eyebrow">Codice</div><p class="small"><span class="mono">${esc(c)}</span> — classe ${esc(CODICI1[a.k1]||"?")} · sottoclasse ${esc(CODICI2[a.k1+"|"+a.k2]||"?")} · materiale ${esc(a.mat||"?")} · colore ${esc(a.cc||"?")}</p>
+        ${a.dup?UI.nota("Questo codice compare su più righe del file: va reso univoco prima della pubblicazione (vedi Import)."):""}</div>
       <div class="art-grp"><div class="eyebrow">Storico modifiche · ${(a.storico||[]).length}</div>${(a.storico||[]).slice().reverse().map(h=>`<div class="small"><span class="mono tiny muted">${h.q}</span> ${esc(h.chi)} — ${esc(h.n)}</div>`).join("")||'<p class="small muted">Nessuna modifica: dati originali.</p>'}</div>`
   };
   const schede=`<div class="tabbar" role="tablist">${SCHEDE_ART.map(([k,l])=>`<button role="tab" data-act="tab" data-k="atab" data-v="${k}" aria-selected="${tab===k}">${l}${mancaIn(k)?`<span class="tab-n warn" title="${mancaIn(k)} dati mancanti">${mancaIn(k)}</span>`:""}${k==="comp"&&a.comp?.length?`<span class="tab-n">${a.comp.length}</span>`:""}</button>`).join("")}</div>`;
@@ -230,8 +286,9 @@ function drawerArticolo(){
       ${a.stato==="revisione"&&state.ruolo==="curatore"?`<button class="btn" data-act="scarta" data-c="${esc(c)}">Rimanda</button><button class="btn btn-primary" data-act="approva" data-c="${esc(c)}">Approva e pubblica</button>`:a.stato!=="pubblicato"&&a.stato!=="revisione"?`<button class="btn btn-primary" data-act="invia" data-c="${esc(c)}">Invia in revisione</button>`:""}`}`;
   fillDrawer(`${a.b} · ${cap(a.k1)} › ${cap(a.k2)}`,a.t||a.d,`<div class="art">${riep}<section class="art-main">${schede}<div class="art-pane">${corpo[tab]()}</div></section></div>`,foot);
 }
+const FORNITORI=()=>[...new Set(ARTICOLI().map(conOv).flatMap(x=>(x.forn||[]).map(f=>f.nome)))].sort();
 const suggerisciComp=a=>{const parola=(a.t||a.d).split(/\s+/).find(w=>w.length>3&&!/poltrona|divano|pouf|tavolo|sedia/i.test(w))||"";
-  return ARTICOLI().filter(x=>x.b!==a.b&&(/copertur|fodera|struttur|piano|gamba|telo|zavorr|cuscin/i.test(x.d))&&(!parola||x.d.toLowerCase().includes(parola.toLowerCase())||x.k1===a.k1)).slice(0,40);};
+  return ARTICOLI().map(conOv).filter(x=>x.b!==a.b&&(x.tipo==="componente"||/piano|gamba|telo|zavorr|cuscin/i.test(x.d))&&(!parola||x.d.toLowerCase().includes(parola.toLowerCase())||x.k1===a.k1)).slice(0,40);};
 
 /* ---------- AI simulata ---------- */
 const KW=[[/pallet|legno|rustic|botte|cassett/i,"Rustico"],[/ferro|metall|industr|acciaio|corten/i,"Industrial"],[/velluto|oro|ottone|crist|specchi/i,"Luxury"],[/bamb|rattan|vimini|midollino|juta|paglia/i,"Boho"],[/tropic|palm|jungle|mare|righe/i,"Tropicale"],[/vintage|retr|anni/i,"Vintage"],[/bianc|minimal|plexi|metacril/i,"Minimal"],[/shabby|provenz|decap/i,"Shabby chic"]];
@@ -402,10 +459,11 @@ function viewRevisione(){
 /* ---------- IMPORT ---------- */
 const ANOMALIE={duplicati:["Codice duplicato","Lo stesso codice compare su più righe","Decidere quale riga tenere o assegnare un nuovo codice colore"],
   fuori_schema:["Codice fuori schema","Non rispetta XXFFFprprg-CC","Ricodificare"],breve_lunga:["Descrizione breve oltre 40 caratteri","Il tracciato ERP ammette 40 caratteri","Accorciare: il resto va nel titolo o nella descrizione estesa"],
-  dimensioni:["Dimensioni non leggibili","Testo non interpretabile come misure","Misurare o correggere il testo"],coperture:["Copertura o fodera","È il rivestimento di un altro articolo","Collegarla come componente «rivestimento» dell'articolo principale"]};
+  dimensioni:["Dimensioni non leggibili","Testo non interpretabile come misure","Misurare o correggere il testo"],coperture:["Copertura o fodera","È il rivestimento di un altro articolo","Collegarla come componente «rivestimento» dell'articolo principale"],
+  foto_codice:["Foto di un altro codice","Il nome del file foto non inizia con il codice dell'articolo","Rinominare la foto o collegarla all'articolo giusto"]};
 function viewImport(){
   const A=CAT.anomalie, g=gruppi(), multi=g.filter(x=>x.length>1).length, dimOk=CAT.articoli.filter(a=>a.L||a.D).length;
-  const tutte=Object.entries(A).flatMap(([k,l])=>(l||[]).map(c=>({c,k,a:art(c)}))), campi={k:r=>r.k};
+  const tutte=[...Object.entries(A).flatMap(([k,l])=>(l||[]).map(c=>({c,k,a:art(c)}))),...CAT.articoli.filter(a=>fotoFuori(a).length).map(a=>({c:a.c,k:"foto_codice",a:conOv(a)}))], campi={k:r=>r.k};
   const righe=UI.filtra("imp",tutte,r=>[r.c,r.a?.d,ANOMALIE[r.k]?.[0]].join(" "),campi);
   return `<section class="kpis">${UI.kpi(num(CAT.articoli.length,0),"articoli importati")}${UI.kpi(num(multi,0),"modelli con varianti di colore")}${UI.kpi(Math.round(dimOk/(CAT.articoli.length||1)*100)+"%","dimensioni leggibili")}${UI.kpi(num(tutte.length,0),"anomalie",["da sistemare","warn"])}</section>
     ${UI.pannello({titolo:"Dal file al catalogo",corpo:`<div class="card-body">${UI.dettagli([["File","<span class='mono'>Articoli_13_10_25_rev2_mod.xlsx</span>"],["Codice","spazi rimossi; dal codice si ricavano classe, sottoclasse, <strong>materiale</strong> e <strong>colore</strong>"],
@@ -419,12 +477,12 @@ function viewImport(){
 /* ---------- API ---------- */
 function viewApi(){
   const a=art(state.sel||"SEPOU83006-11")||CAT.articoli[0], ex={codice:a.c,modello:a.b,nome:a.t||a.d,descrizione:a.e,classificazione:[a.k1,a.k2,a.k3],colore:{codice:a.cc,nome:nomeColore(a.cc),rgb:a.rgb||[]},materiale:a.mat?{codice:a.mat,nome:nomeMateriale(a.mat)}:null,
-    dimensioni_cm:{L:a.L,P:a.P,H:a.H,D:a.D},logistica:{volume_m3:a.vol??null,peso_kg:a.peso??null,pezzi_per_pila:a.pila??null},funzione:a.funz||[],stili:a.stili||[],temi:a.temi||[],componenti:a.comp||[],
+    tipo:a.tipo,dimensioni_cm:{L:a.L,P:a.P,H:a.H,D:a.D},logistica:{volume_m3:a.vol??(a.L&&a.P&&a.H?+(a.L*a.P*a.H/1e6).toFixed(3):null),volume_stimato:!a.vol,peso_kg:a.peso??null,pezzi_per_pila:a.pila??null,persone:a.pers??null},prezzi:a.prezzi,fornitori:(a.forn||[]).map(f=>({nome:f.nome,codice:f.codice||null,principale:!!f.principale})),giacenza_fisica:a.giacenza??null,funzione:a.funz||[],stili:a.stili||[],temi:a.temi||[],componenti:a.comp||[],
     varianti:(gruppi().find(g=>g.some(x=>x.c===a.c))||[]).map(x=>x.c),foto:(a.foto||[]).map(f=>"https://…/foto/"+f),stato:statoArt(a)[0]};
   return `<div class="ptwo">${UI.pannello({titolo:"API REST (sola lettura)",aiuto:"vista-api",corpo:UI.tabella({colonne:[{t:"Metodo"},{t:"Percorso",mono:true},{t:"Cosa restituisce"}],righe:[
       ["GET","/articoli","elenco con filtri: testo, classe, funzione, stile, tema, colore vicino a un RGB, stato, aggiornati dopo il…"],["GET","/articoli/{codice}","scheda completa con varianti, componenti, foto, misure"],
-      ["GET","/articoli/{codice}/foto","foto originali e di presentazione"],["GET","/modelli/{codice}","modello con tutte le varianti di colore"],["GET","/tassonomie","classi, colori, materiali, funzioni, stili, temi"],["POST","webhook","articolo.pubblicato / articolo.modificato"]].map(r=>[UI.stato(r[0],r[0]==="GET"?"ok":"info"),esc(r[1]),`<span class="small">${esc(r[2])}</span>`])}),
-      piede:"Escono solo gli articoli pubblicati. Chiavi per sistema (ERP, sito, logistica), registro degli accessi."})}
+      ["GET","/articoli/{codice}/foto","foto originali e di presentazione"],["GET","/modelli/{codice}","modello con tutte le varianti di colore"],["GET","/tassonomie","categorie e sottocategorie in ordine, colori, materiali, funzioni, stili, temi"],["GET","/articoli/{codice}/logistica","volume, peso, L×P×H, pezzi per pila, persone, tempi: per dimensionare i mezzi"],["GET","/logistica/articoli?codici=…","gli stessi dati per tutte le righe di un'offerta, in una chiamata"],["GET","/fornitori, /fornitori/{id}/articoli","fornitori e articoli che forniscono, con codici e prezzi"],["GET","/export/erp","tracciato per l'ERP: il catalogo è la fonte, l'ERP riceve"],["POST","webhook","articolo.pubblicato / articolo.modificato / prezzo.modificato (anche verso l'ERP)"]].map(r=>[UI.stato(r[0],r[0]==="GET"?"ok":"info"),esc(r[1]),`<span class="small">${esc(r[2])}</span>`])}),
+      piede:"Lettura: escono solo gli articoli pubblicati; prezzi d'acquisto e fornitori solo con le chiavi di ERP e amministrazione. Scrittura (CRUD di articoli, fornitori, composizioni, categorie): solo l'applicazione. Chiavi per sistema, registro degli accessi."})}
     ${UI.pannello({titolo:"Server MCP per gli agenti AI",corpo:UI.tabella({colonne:[{t:"Strumento",mono:true},{t:"Uso"}],righe:[["cerca_articoli","ricerca libera con filtri"],["dettaglio_articolo","scheda di un codice"],["articoli_per_tema","es. «matrimonio rustico all'aperto»"],["articoli_per_colore","vicini a un RGB o a un codice colore"],["composizione","componenti e configurazioni di un articolo"]].map(r=>[r[0],r[1]])})})}</div>
     ${UI.pannello({titolo:`Esempio: GET /articoli/${esc(a.c)}`,azioni:'<span class="small muted">apri un articolo dal catalogo per cambiarlo</span>',corpo:`<pre class="json">${esc(JSON.stringify(ex,null,2))}</pre>`})}`;
 }
@@ -445,6 +503,17 @@ document.addEventListener("click",async ev=>{
     case "dt-seg": { const st=dtStato(b.dataset.dt); st.seg[b.dataset.g]=b.dataset.v; st.pag=0; render(); break; }
     case "dt-reset": { const st=dtStato(b.dataset.dt); st.q=""; st.seg={}; st.pag=0; render(); break; }
     case "vista": state.vista=v; render(); break;
+    case "cat-nav": { const st=dtStato("cat"); st.seg.k2=""; if(!v) st.seg.k1=""; st.q=""; st.pag=0; render(); break; }
+    case "cat-pin": { const pin=DB.catOrd||[]; DB.catOrd=pin.includes(v)?pin.filter(x=>x!==v):[...pin,v]; save(); render(); break; }
+    case "forn-add": { const n=$("nf-nome").value.trim(); if(!n) return toast("Scrivi il nome del fornitore","warn"); const a=art(c);
+      if(a.forn.some(f=>f.nome.toLowerCase()===n.toLowerCase())) return toast("Questo fornitore c'è già","warn");
+      setArt(c,{forn:[...a.forn,{nome:n,codice:$("nf-cod").value.trim(),acquisto:$("nf-pr").value===""?null:+$("nf-pr").value,condizioni:$("nf-cond").value.trim(),principale:!a.forn.length}]},`fornitore aggiunto: ${n}`); dopo("Fornitore aggiunto"); break; }
+    case "forn-main": { const a=art(c); setArt(c,{forn:a.forn.map((f,i)=>({...f,principale:i===+b.dataset.i}))},"fornitore principale"); dopo("Fornitore principale aggiornato"); break; }
+    case "forn-del": { const a=art(c), f=a.forn[+b.dataset.i]; if(!await UI.conferma({titolo:"Togliere il fornitore?",testo:`«${f.nome}» non sarà più tra i fornitori di questo articolo.`,ok:"Togli",pericolo:true})) return;
+      const resto=a.forn.filter((_,i)=>i!==+b.dataset.i); if(f.principale&&resto[0]) resto[0]={...resto[0],principale:true}; setArt(c,{forn:resto},`fornitore tolto: ${f.nome}`); dopo("Fornitore tolto"); break; }
+    case "costo-add": { const imp=$("nk-imp").value; if(imp===""||!$("nk-data").value) return toast("Data e importo sono obbligatori","warn"); const a=art(c);
+      setArt(c,{costi:[...a.costi,{data:$("nk-data").value,tipo:$("nk-tipo").value,importo:+imp,fornitore:$("nk-forn").value,nota:$("nk-nota").value.trim()}]},"costo registrato"); dopo("Costo registrato"); break; }
+    case "giac-ok": setArt(c,{giacenzaIl:oggi()},"conteggio confermato"); dopo("Conteggio confermato"); break;
     case "apri": apri(c); break;
     case "close-drawer": closeDrawer(); break;
     case "dlg-close": closeDlg(b.closest("dialog")); break;
@@ -484,7 +553,11 @@ document.addEventListener("change",async ev=>{
   const el=ev.target, m=M();
   if(el.dataset.f&&el.dataset.c){ const k=el.dataset.f, val=el.type==="number"?(el.value===""?null:+el.value):el.value;
     const patch={[k]:val}; if(k==="k1"){patch.k2=classi2(val)[0]; patch.k3=classi3(val,patch.k2)[0];} if(k==="k2") patch.k3=classi3(art(el.dataset.c).k1,val)[0];
+    if(k==="giacenza") patch.giacenzaIl=oggi();
     setArt(el.dataset.c,patch,`${k} modificato`); dopo("Scheda aggiornata"); }
+  if(el.dataset.prezzo&&el.dataset.c){ const a=art(el.dataset.c), k=el.dataset.prezzo, v=el.value===""?null:+el.value;
+    if(v!=null&&v<0) return toast("Il prezzo non può essere negativo","warn");
+    setArt(el.dataset.c,{prezzi:{...a.prezzi,[k]:v}},`prezzo di ${k}: ${v==null?"tolto":"€ "+num(v,2)}`); dopo("Prezzo aggiornato"); }
   if(el.dataset.tag&&el.dataset.c){ const a=art(el.dataset.c), f=el.dataset.tag, cur=a[f]||[];
     setArt(el.dataset.c,{[f]:el.checked?[...cur,el.value]:cur.filter(x=>x!==el.value)},`${f}: ${el.value}`); dopo(); }
   if(el.id==="np-base") $("np-t").value=PROMPT_STD[+el.value].t;

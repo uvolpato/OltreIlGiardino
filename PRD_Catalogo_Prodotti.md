@@ -14,6 +14,7 @@
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Ugo | Prima bozza dalle richieste del 20/10 |
 | 0.2 | 2026-10-21 | Ugo | Analisi del file articoli IBED (§2bis); codici, classificazioni, colori e varianti allineati ai dati reali |
+| 0.4 | 2026-10-26 | Ugo | Il catalogo è la fonte unica anche per prezzi e fornitori (l'ERP riceve). Prezzi di acquisto/vendita/noleggio, fornitori multipli, storico costi, tipo finito/componente, navigazione obbligatoria categoria → sottocategoria, giacenza fisica, controllo foto ↔ codice. Schema `Catalogo/schema.prisma`, audit `Catalogo/AUDIT_Anagrafica_Articoli.md` |
 | 0.3 | 2026-10-26 | Ugo | Nome della piattaforma: **Oltre Il Giardino** (non «Serra»). Prototipo allineato alla suite: stessi componenti della Logistica; scheda articolo a schede con riepilogo fisso, responsive (§5.7) |
 
 ---
@@ -162,19 +163,20 @@ SE POU 83 006 - 10
 - **Alternative valutate:**
   - *Restare in Excel / SharePoint:* nessuna API, nessuna foto gestita, nessuno storico.
   - *PIM commerciale (Akeneo, Pimcore, Plytix):* ottimi per prodotti venduti, ma pesanti da configurare per composizioni e temi da evento, e senza il flusso "foto da telefono → AI".
-  - *Anagrafica articoli dell'ERP:* va **collegata** (codice articolo), non sostituita; non è adatta a foto multiple, AI e consultazione mobile.
+  - *Anagrafica articoli dell'ERP:* **non è la fonte** (decisione del 26/10/2026): riceve i dati dal catalogo, collegata dal codice articolo; non è adatta a foto multiple, AI e consultazione mobile.
 
 ### Rapporto con l'ERP (erpCUBE)
-Il file articoli è il tracciato con cui l'anagrafica viene caricata nell'ERP. Proposta di ripartizione:
+Il file articoli è il tracciato con cui l'anagrafica viene caricata nell'ERP. **Decisione del 26/10/2026: il catalogo è la fonte di tutti i dati articolo, prezzi e fornitori compresi; l'ERP li riceve.**
 
 | Dato | Proprietario | Verso |
 |---|---|---|
-| Codice, descrizioni, classificazioni, colore, materiale, dimensioni, foto, fornitori | **Catalogo** | Catalogo → ERP (esportazione nel tracciato IBED, poi via API se erpCUBE la offre) |
+| Codice, descrizioni, classificazioni, tipo (finito / componente), colore, materiale, dimensioni, foto | **Catalogo** | Catalogo → ERP (esportazione nel tracciato IBED, poi via API se erpCUBE la offre) |
 | Volume, peso, impilabilità, tempi, componenti, temi, stili, colori RGB | **Catalogo** | solo catalogo (e logistica, sito, MCP) |
-| Prezzi di noleggio e vendita | 🔵 **da decidere**: ERP (consigliato, perché fattura) oppure catalogo | — |
-| Giacenze e movimenti | Magazzino (fase successiva) | — |
+| Prezzi di acquisto, vendita e noleggio; fornitori (più di uno per articolo) e storico dei costi | **Catalogo** | Catalogo → ERP (`/export/erp`, webhook `prezzo.modificato`) |
+| Giacenza fisica (conteggio manuale, in attesa del nuovo magazzino) | **Catalogo** | Catalogo → magazzino |
+| Movimenti e impegni di magazzino | Magazzino (fase successiva) | — |
 
-Così il catalogo diventa la fonte di verità per il prodotto e l'ERP resta la fonte per amministrazione e fatturazione, collegati dal codice articolo.
+Così il catalogo è la fonte unica per prodotto e prezzi; l'ERP resta lo strumento di amministrazione e fatturazione e riceve i dati dal catalogo, collegati dal codice articolo. Modello dati: `Catalogo/schema.prisma`; verifica dei requisiti: `Catalogo/AUDIT_Anagrafica_Articoli.md`.
 
 ---
 

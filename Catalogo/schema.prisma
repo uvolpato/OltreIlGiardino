@@ -1,0 +1,217 @@
+// Catalogo prodotti — modello dati di produzione (Prisma + PostgreSQL, stack del Portale B2B Luis).
+// Il catalogo è la fonte unica dei dati articolo: sito, preventivi, logistica e ERP leggono da qui.
+// Allineato al prototipo Prototipo-Catalogo/ (campi tra parentesi = nome nel prototipo).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TipoArticolo {
+  FINITO      // si noleggia da solo (tipo: "finito")
+  COMPONENTE  // parte di altri articoli: anima, rivestimento, struttura (tipo: "componente")
+}
+
+enum StatoArticolo {
+  DA_COMPLETARE
+  DA_REVISIONARE
+  COMPLETO
+  PUBBLICATO
+}
+
+enum RuoloComponente {
+  PARTE
+  ANIMA
+  RIVESTIMENTO
+  STRUTTURA
+}
+
+enum TipoCosto {
+  PRODUZIONE
+  RIACQUISTO
+}
+
+enum TipoFoto {
+  ORIGINALE
+  PRESENTAZIONE
+}
+
+/// Gerarchia obbligatoria a due livelli: Categoria (k1) -> Sottocategoria (k2). Un articolo sta sempre in una sottocategoria.
+model Categoria {
+  id         Int         @id @default(autoincrement())
+  codice     String      // AC, BAC… (dal foglio Classificazioni)
+  nome       String
+  padreId    Int?        // null = categoria principale; valorizzato = sottocategoria
+  padre      Categoria?  @relation("Gerarchia", fields: [padreId], references: [id])
+  figlie     Categoria[] @relation("Gerarchia")
+  ordine     Int?        // ordinamento personalizzato (catOrd); null = alfabetico dopo quelle ordinate
+  articoli   Articolo[]
+  tipologie  Tipologia[]
+
+  @@unique([padreId, codice])
+}
+
+/// Terzo livello descrittivo (k3, es. "Poltrone"): filtro, non livello di navigazione.
+model Tipologia {
+  id               Int        @id @default(autoincrement())
+  codice           String
+  nome             String
+  sottocategoriaId Int
+  sottocategoria   Categoria  @relation(fields: [sottocategoriaId], references: [id])
+  articoli         Articolo[]
+
+  @@unique([sottocategoriaId, codice])
+}
+
+/// Scala colori aziendale (codice -CC del codice articolo).
+model Colore {
+  codice   String     @id // "01", "80"…
+  nome     String
+  famiglia String     // bianco, grigio…
+  hex      String?
+  articoli Articolo[]
+}
+
+model Materiale {
+  codice   String     @id // pr nel codice XXFFFprprg-CC
+  nome     String
+  articoli Articolo[]
+}
+
+model Articolo {
+  id               Int            @id @default(autoincrement())
+  codice           String         @unique // c — univoco: i duplicati del file si risolvono in migrazione
+  modello          String         // b — codice senza "-CC": raggruppa le varianti di colore
+  tipo             TipoArticolo   @default(FINITO)
+  stato            StatoArticolo  @default(DA_COMPLETARE)
+  nome             String         // t
+  descrBreve       String         @db.VarChar(40) // d — limite del tracciato verso l'ERP
+  descrizione      String?        // e
+  sottocategoriaId Int
+  sottocategoria   Categoria      @relation(fields: [sottocategoriaId], references: [id])
+  tipologiaId      Int?
+  tipologia        Tipologia?     @relation(fields: [tipologiaId], references: [id])
+  coloreCodice     String?
+  colore           Colore?        @relation(fields: [coloreCodice], references: [codice])
+  materialeCodice  String?
+  materiale        Materiale?     @relation(fields: [materialeCodice], references: [codice])
+  unita            String         @default("NR")
+
+  // dimensioni e logistica: letti dal pianificatore per dimensionare i mezzi
+  lunghezzaCm      Decimal?       @db.Decimal(8, 1) // L
+  profonditaCm     Decimal?       @db.Decimal(8, 1) // P
+  altezzaCm        Decimal?       @db.Decimal(8, 1) // H
+  diametroCm       Decimal?       @db.Decimal(8, 1) // D
+  dimensioniTesto  String?        // dim — testo originale del file
+  volumeM3         Decimal?       @db.Decimal(8, 3) // vol — da imballato
+  pesoKg           Decimal?       @db.Decimal(8, 1) // peso
+  pezziPerPila     Int?           // pila
+  personePerPezzo  Int?           // pers
+  minCaricoPezzo   Decimal?       @db.Decimal(6, 1) // tCar
+  minMontaggioPezzo Decimal?      @db.Decimal(6, 1) // tMon
+
+  // prezzi (il catalogo è la fonte; l'ERP li riceve)
+  prezzoAcquisto   Decimal?       @db.Decimal(10, 2)
+  prezzoVendita    Decimal?       @db.Decimal(10, 2)
+  prezzoNoleggio   Decimal?       @db.Decimal(10, 2)
+
+  // giacenza fisica, allineata a mano in vista del nuovo magazzino
+  giacenzaFisica   Int?
+  giacenzaContataIl DateTime?
+
+  funzioni         String[]       // funz
+  stili            String[]
+  temi             String[]
+  caratteristiche  String[]       // attr
+  coloriRgb        Json?          // rgb: [{hex, pct}] dalla foto
+
+  fornitori        ArticoloFornitore[]
+  costi            CostoStorico[]
+  componenti       Composizione[] @relation("Padre")
+  usatoIn          Composizione[] @relation("Componente")
+  foto             Foto[]
+  modifiche        Modifica[]
+  creatoIl         DateTime       @default(now())
+  aggiornatoIl     DateTime       @updatedAt
+
+  @@index([modello])
+  @@index([sottocategoriaId, codice]) // elenco per sottocategoria, ordinato per codice
+}
+
+model Fornitore {
+  id        Int                 @id @default(autoincrement())
+  nome      String              @unique
+  partitaIva String?
+  articoli  ArticoloFornitore[]
+  costi     CostoStorico[]
+}
+
+/// Molti-a-molti articolo <-> fornitore, con le condizioni di quel fornitore.
+model ArticoloFornitore {
+  articoloId      Int
+  fornitoreId     Int
+  articolo        Articolo  @relation(fields: [articoloId], references: [id], onDelete: Cascade)
+  fornitore       Fornitore @relation(fields: [fornitoreId], references: [id])
+  codiceFornitore String?
+  prezzoAcquisto  Decimal?  @db.Decimal(10, 2)
+  condizioni      String?   // tempi di consegna, minimi d'ordine
+  principale      Boolean   @default(false) // al massimo uno per articolo (vincolo applicativo + indice parziale in migrazione)
+
+  @@id([articoloId, fornitoreId])
+}
+
+/// Storico dei costi di produzione e di riacquisto.
+model CostoStorico {
+  id          Int        @id @default(autoincrement())
+  articoloId  Int
+  articolo    Articolo   @relation(fields: [articoloId], references: [id], onDelete: Cascade)
+  data        DateTime   @db.Date
+  tipo        TipoCosto
+  importo     Decimal    @db.Decimal(10, 2)
+  fornitoreId Int?
+  fornitore   Fornitore? @relation(fields: [fornitoreId], references: [id])
+  nota        String?
+
+  @@index([articoloId, data])
+}
+
+/// Distinta base: un articolo (padre) composto da parti (es. pouf = anima + rivestimento colorato).
+/// Regola applicativa: il componente non può essere il padre stesso né contenerlo (niente cicli).
+model Composizione {
+  padreId      Int
+  componenteId Int
+  padre        Articolo        @relation("Padre", fields: [padreId], references: [id], onDelete: Cascade)
+  componente   Articolo        @relation("Componente", fields: [componenteId], references: [id])
+  ruolo        RuoloComponente
+  quantita     Int             @default(1)
+
+  @@id([padreId, componenteId, ruolo])
+}
+
+model Foto {
+  id          Int      @id @default(autoincrement())
+  articoloId  Int
+  articolo    Articolo @relation(fields: [articoloId], references: [id], onDelete: Cascade)
+  file        String   @unique // nome file: in migrazione deve iniziare con il codice dell'articolo
+  tipo        TipoFoto @default(ORIGINALE)
+  principale  Boolean  @default(false)
+  prompt      String?  // per le foto di presentazione generate
+  creataIl    DateTime @default(now())
+}
+
+/// Storico delle modifiche (storico nel prototipo); base anche per gli eventi verso l'ERP.
+model Modifica {
+  id         Int      @id @default(autoincrement())
+  articoloId Int
+  articolo   Articolo @relation(fields: [articoloId], references: [id], onDelete: Cascade)
+  utente     String
+  quando     DateTime @default(now())
+  campo      String
+  prima      Json?
+  dopo       Json?
+  nota       String?
+}

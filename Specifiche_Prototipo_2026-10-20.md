@@ -39,6 +39,7 @@ Lavoro dei giorni 25–26/10. Le voci 13, 15 e 16 della tabella del 25/10 sono s
 | 5 | **Responsive** | Sotto 1024 px la modale occupa lo schermo e il riepilogo va in alto; sotto 600 px riepilogo compatto, schede scorrevoli, campi due per riga, chiusura con la × in alto. |
 | 6 | **Nome** | «Serra» sostituito da «Oltre Il Giardino» (resta solo la chiave interna di salvataggio del browser). |
 | 7 | **Listino pubblicabile** | `Catalogo/pubblica.py` crea `articoli-demo.js` senza fornitori, prezzi e note interne; usato su GitHub Pages quando manca `articoli.js`. |
+| 8 | **Anagrafica come fonte unica** | Prezzi di acquisto, vendita e noleggio; più fornitori per articolo con codice, prezzo e condizioni; storico dei costi; tipo finito / componente; giacenza fisica con data del conteggio; navigazione obbligatoria Categoria → Sottocategoria → Prodotti (categorie in ordine alfabetico, ★ per metterle in testa; prodotti per codice); anomalia «foto di un altro codice». L'ERP riceve i dati dal catalogo. Dettagli: `Catalogo/AUDIT_Anagrafica_Articoli.md`, schema `Catalogo/schema.prisma`. |
 
 ---
 
